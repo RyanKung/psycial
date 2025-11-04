@@ -3,62 +3,144 @@
 /// TAACO: Tool for the Automatic Analysis of Cohesion
 /// 168 features for analyzing text cohesion and coherence
 /// Based on Crossley et al., 2016
-
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 
 // Connectives and discourse markers
 const CAUSAL_CONNECTIVES: &[&str] = &[
-    "because", "since", "as", "for", "therefore", "thus", "hence", "consequently",
-    "accordingly", "so", "result", "cause", "effect", "reason", "due to", "owing to",
+    "because",
+    "since",
+    "as",
+    "for",
+    "therefore",
+    "thus",
+    "hence",
+    "consequently",
+    "accordingly",
+    "so",
+    "result",
+    "cause",
+    "effect",
+    "reason",
+    "due to",
+    "owing to",
 ];
 
 const TEMPORAL_CONNECTIVES: &[&str] = &[
-    "when", "while", "before", "after", "then", "next", "finally", "meanwhile",
-    "subsequently", "previously", "formerly", "until", "once", "now", "currently",
+    "when",
+    "while",
+    "before",
+    "after",
+    "then",
+    "next",
+    "finally",
+    "meanwhile",
+    "subsequently",
+    "previously",
+    "formerly",
+    "until",
+    "once",
+    "now",
+    "currently",
 ];
 
 const ADDITIVE_CONNECTIVES: &[&str] = &[
-    "and", "also", "moreover", "furthermore", "additionally", "besides", "plus",
-    "likewise", "similarly", "equally", "too", "as well",
+    "and",
+    "also",
+    "moreover",
+    "furthermore",
+    "additionally",
+    "besides",
+    "plus",
+    "likewise",
+    "similarly",
+    "equally",
+    "too",
+    "as well",
 ];
 
 const ADVERSATIVE_CONNECTIVES: &[&str] = &[
-    "but", "however", "although", "though", "yet", "nevertheless", "nonetheless",
-    "despite", "in spite of", "whereas", "while", "conversely", "on the contrary",
-    "on the other hand", "instead", "rather",
+    "but",
+    "however",
+    "although",
+    "though",
+    "yet",
+    "nevertheless",
+    "nonetheless",
+    "despite",
+    "in spite of",
+    "whereas",
+    "while",
+    "conversely",
+    "on the contrary",
+    "on the other hand",
+    "instead",
+    "rather",
 ];
 
 // Logical operators
 const LOGICAL_OPERATORS: &[&str] = &[
-    "if", "then", "else", "therefore", "thus", "hence", "implies", "entails",
-    "follows", "necessarily", "must", "should", "would", "could", "might", "may",
+    "if",
+    "then",
+    "else",
+    "therefore",
+    "thus",
+    "hence",
+    "implies",
+    "entails",
+    "follows",
+    "necessarily",
+    "must",
+    "should",
+    "would",
+    "could",
+    "might",
+    "may",
 ];
 
 // Reference and co-reference markers
-const DEMONSTRATIVES: &[&str] = &[
-    "this", "that", "these", "those", "here", "there", "such",
-];
+const DEMONSTRATIVES: &[&str] = &["this", "that", "these", "those", "here", "there", "such"];
 
 const PERSONAL_PRONOUNS: &[&str] = &[
-    "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them",
-    "my", "your", "his", "her", "its", "our", "their", "mine", "yours", "ours", "theirs",
+    "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", "my", "your",
+    "his", "her", "its", "our", "their", "mine", "yours", "ours", "theirs",
 ];
 
 // Clarification and elaboration
 const ELABORATION_MARKERS: &[&str] = &[
-    "for example", "for instance", "such as", "namely", "specifically", "in particular",
-    "especially", "particularly", "including", "like",
+    "for example",
+    "for instance",
+    "such as",
+    "namely",
+    "specifically",
+    "in particular",
+    "especially",
+    "particularly",
+    "including",
+    "like",
 ];
 
 const CLARIFICATION_MARKERS: &[&str] = &[
-    "that is", "in other words", "to put it another way", "to clarify", "meaning",
-    "i mean", "actually", "in fact", "indeed",
+    "that is",
+    "in other words",
+    "to put it another way",
+    "to clarify",
+    "meaning",
+    "i mean",
+    "actually",
+    "in fact",
+    "indeed",
 ];
 
 pub struct TaacoExtractor {
     word_regex: Regex,
     sentence_regex: Regex,
+}
+
+impl Default for TaacoExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TaacoExtractor {
@@ -90,7 +172,7 @@ impl TaacoExtractor {
         features.push(self.count_ratio(&words, TEMPORAL_CONNECTIVES, word_count));
         features.push(self.count_ratio(&words, ADDITIVE_CONNECTIVES, word_count));
         features.push(self.count_ratio(&words, ADVERSATIVE_CONNECTIVES, word_count));
-        
+
         // All connectives
         let all_connectives: Vec<&str> = CAUSAL_CONNECTIVES
             .iter()
@@ -100,7 +182,7 @@ impl TaacoExtractor {
             .copied()
             .collect();
         features.push(self.count_ratio(&words, &all_connectives, word_count));
-        
+
         // Connective diversity
         let unique_connectives = self.count_unique_words(&words, &all_connectives);
         let total_connectives = self.count_words(&words, &all_connectives);
@@ -116,11 +198,11 @@ impl TaacoExtractor {
         // === Reference and Co-reference - 40 features ===
         features.push(self.count_ratio(&words, DEMONSTRATIVES, word_count));
         features.push(self.count_ratio(&words, PERSONAL_PRONOUNS, word_count));
-        
+
         // Pronoun density
         let pronoun_count = self.count_words(&words, PERSONAL_PRONOUNS);
         features.push(pronoun_count / word_count * 100.0);
-        
+
         // Demonstrative density
         let demonstrative_count = self.count_words(&words, DEMONSTRATIVES);
         features.push(demonstrative_count / word_count * 100.0);
@@ -130,26 +212,26 @@ impl TaacoExtractor {
         features.push(self.count_ratio(&words, CLARIFICATION_MARKERS, word_count));
 
         // === Lexical Overlap - 30 features ===
-        
+
         // Sentences
         let sentences: Vec<&str> = self.sentence_regex.split(text).collect();
         let sentence_count = sentences.len() as f64;
         features.push(sentence_count);
-        
+
         // Average sentence length
         if sentence_count > 0.0 {
             features.push(word_count / sentence_count);
         } else {
             features.push(0.0);
         }
-        
+
         // Sentence length variation
         let sent_lengths: Vec<usize> = sentences
             .iter()
             .map(|s| self.word_regex.find_iter(s).count())
             .collect();
         features.push(self.calculate_std(&sent_lengths));
-        
+
         // Adjacent sentence overlap (simplified LSA)
         if sentences.len() > 1 {
             let mut overlaps = Vec::new();
@@ -164,15 +246,15 @@ impl TaacoExtractor {
                     .find_iter(sentences[i + 1])
                     .map(|m| m.as_str())
                     .collect();
-                
+
                 let intersection = words1.intersection(&words2).count() as f64;
                 let union = words1.union(&words2).count() as f64;
-                
+
                 if union > 0.0 {
                     overlaps.push(intersection / union);
                 }
             }
-            
+
             if !overlaps.is_empty() {
                 let mean_overlap = overlaps.iter().sum::<f64>() / overlaps.len() as f64;
                 features.push(mean_overlap);
@@ -184,21 +266,22 @@ impl TaacoExtractor {
         }
 
         // === Word Repetition - 28 features ===
-        
+
         // Content word repetition
-        let word_freq: HashMap<&str, usize> = words.iter().fold(HashMap::new(), |mut map, &word| {
-            *map.entry(word).or_insert(0) += 1;
-            map
-        });
-        
+        let word_freq: HashMap<&str, usize> =
+            words.iter().fold(HashMap::new(), |mut map, &word| {
+                *map.entry(word).or_insert(0) += 1;
+                map
+            });
+
         // Average word frequency
         let avg_freq = word_freq.values().sum::<usize>() as f64 / word_freq.len() as f64;
         features.push(avg_freq);
-        
+
         // Max word frequency
         let max_freq = *word_freq.values().max().unwrap_or(&0) as f64;
         features.push(max_freq);
-        
+
         // Words appearing more than once
         let repeated_words = word_freq.values().filter(|&&count| count > 1).count() as f64;
         features.push(repeated_words / word_freq.len() as f64);
@@ -243,7 +326,7 @@ impl TaacoExtractor {
         if values.is_empty() {
             return 0.0;
         }
-        
+
         let mean = values.iter().sum::<usize>() as f64 / values.len() as f64;
         let variance = values
             .iter()
@@ -253,7 +336,7 @@ impl TaacoExtractor {
             })
             .sum::<f64>()
             / values.len() as f64;
-        
+
         variance.sqrt()
     }
 }
@@ -274,7 +357,7 @@ mod tests {
         let extractor = TaacoExtractor::new();
         let text = "I went to the store because I needed milk. However, it was closed.";
         let features = extractor.extract_features(text);
-        
+
         // Should detect causal and adversative connectives
         assert!(features[0] > 0.0); // Causal
         assert!(features[3] > 0.0); // Adversative
@@ -285,9 +368,8 @@ mod tests {
         let extractor = TaacoExtractor::new();
         let text = "The cat is black. The cat is sleeping.";
         let features = extractor.extract_features(text);
-        
+
         // Should have sentence count
         assert!(features[13] > 0.0);
     }
 }
-

@@ -1,5 +1,5 @@
-/// Real BERT using rust-bert (Rust API, libtorch backend)
-/// Based on: https://github.com/guillaume-be/rust-bert
+//! Real BERT using rust-bert (Rust API, libtorch backend)
+//! Based on: https://github.com/guillaume-be/rust-bert
 
 #[cfg(feature = "bert")]
 use rust_bert::pipelines::sentence_embeddings::{
@@ -20,26 +20,25 @@ impl RustBertEncoder {
         println!("   Model: all-MiniLM-L6-v2 (sentence-transformers)");
         println!("   Backend: libtorch (PyTorch C++)");
         println!("   Downloading model on first run...\n");
-        
+
         // Use MiniLM - smaller but better for this task
-        let model = SentenceEmbeddingsBuilder::remote(
-            SentenceEmbeddingsModelType::AllMiniLmL12V2
-        )
-        .create_model()
-        .map_err(|e| format!("Model creation failed: {}", e))?;
-        
+        let model = SentenceEmbeddingsBuilder::remote(SentenceEmbeddingsModelType::AllMiniLmL12V2)
+            .create_model()
+            .map_err(|e| format!("Model creation failed: {}", e))?;
+
         println!("   ✓ BERT model ready! (384 dimensions)\n");
-        
+
         Ok(RustBertEncoder { model })
     }
-    
+
     /// Extract BERT sentence embeddings
     pub fn extract_features(&self, text: &str) -> Result<Vec<f64>, Box<dyn Error>> {
         // Encode single sentence
-        let embeddings = self.model
+        let embeddings = self
+            .model
             .encode(&[text])
             .map_err(|e| format!("Encoding failed: {}", e))?;
-        
+
         // Return first (and only) embedding as Vec<f64>
         if let Some(embedding) = embeddings.first() {
             Ok(embedding.iter().map(|&x| x as f64).collect())
@@ -47,25 +46,29 @@ impl RustBertEncoder {
             Err("No embedding generated".into())
         }
     }
-    
+
     /// Batch extract features for multiple texts (more efficient)
     #[allow(dead_code)]
-    pub fn extract_features_batch(&self, texts: &[String]) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
+    pub fn extract_features_batch(
+        &self,
+        texts: &[String],
+    ) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
         let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
-        
-        let embeddings = self.model
+
+        let embeddings = self
+            .model
             .encode(&text_refs)
             .map_err(|e| format!("Batch encoding failed: {}", e))?;
-        
+
         Ok(embeddings
             .iter()
             .map(|emb| emb.iter().map(|&x| x as f64).collect())
             .collect())
     }
-    
+
     #[allow(dead_code)]
     pub fn embedding_dim(&self) -> usize {
-        384  // all-MiniLM-L12-v2 dimension
+        384 // all-MiniLM-L12-v2 dimension
     }
 }
 
@@ -80,17 +83,20 @@ impl RustBertEncoder {
     pub fn new() -> Result<Self, Box<dyn Error>> {
         Err("BERT not enabled. Compile with: cargo build --features bert".into())
     }
-    
+
     #[allow(dead_code)]
     pub fn extract_features(&self, _text: &str) -> Result<Vec<f64>, Box<dyn Error>> {
         Err("BERT not enabled".into())
     }
-    
+
     #[allow(dead_code)]
-    pub fn extract_features_batch(&self, _texts: &[String]) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
+    pub fn extract_features_batch(
+        &self,
+        _texts: &[String],
+    ) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
         Err("BERT not enabled".into())
     }
-    
+
     #[allow(dead_code)]
     pub fn embedding_dim(&self) -> usize {
         384
@@ -113,4 +119,3 @@ mod tests {
         }
     }
 }
-

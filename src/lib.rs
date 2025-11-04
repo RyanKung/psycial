@@ -1,20 +1,20 @@
 //! MBTI Personality Prediction Library
-//! 
+//!
 //! This library provides multiple models for MBTI personality type prediction
 //! based on text input.
-//! 
+//!
 //! # Quick Start
-//! 
+//!
 //! ```no_run
 //! use psycial::{BaselineClassifier, load_data};
-//! 
+//!
 //! // Load training data
 //! let records = load_data("data/mbti_1.csv")?;
-//! 
+//!
 //! // Train a baseline model
 //! let mut classifier = BaselineClassifier::new();
 //! classifier.train(&records)?;
-//! 
+//!
 //! // Predict personality type
 //! let prediction = classifier.predict("I love coding and solving problems")?;
 //! println!("Predicted type: {}", prediction);
@@ -28,9 +28,9 @@ pub mod psyattention;
 
 // Optional BERT modules
 #[cfg(feature = "bert")]
-pub mod bert_only;
-#[cfg(feature = "bert")]
 pub mod bert_mlp;
+#[cfg(feature = "bert")]
+pub mod bert_only;
 #[cfg(feature = "bert")]
 pub mod hybrid_tfidf_bert;
 #[cfg(feature = "bert")]
@@ -53,20 +53,18 @@ pub struct MbtiRecord {
 }
 
 /// Load MBTI data from CSV file
-/// 
+///
 /// # Example
 /// ```no_run
 /// use psycial::load_data;
-/// 
+///
 /// let records = load_data("data/mbti_1.csv")?;
 /// println!("Loaded {} records", records.len());
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn load_data(path: &str) -> Result<Vec<MbtiRecord>, Box<dyn Error>> {
     let file = File::open(path)?;
-    let mut reader = ReaderBuilder::new()
-        .has_headers(true)
-        .from_reader(file);
+    let mut reader = ReaderBuilder::new().has_headers(true).from_reader(file);
 
     let mut records = Vec::new();
     for result in reader.deserialize() {
@@ -78,11 +76,11 @@ pub fn load_data(path: &str) -> Result<Vec<MbtiRecord>, Box<dyn Error>> {
 }
 
 /// Split data into train and test sets
-/// 
+///
 /// # Example
 /// ```no_run
 /// use psycial::{load_data, split_data};
-/// 
+///
 /// let records = load_data("data/mbti_1.csv")?;
 /// let (train, test) = split_data(&records, 0.8);
 /// println!("Train: {}, Test: {}", train.len(), test.len());
@@ -91,15 +89,15 @@ pub fn load_data(path: &str) -> Result<Vec<MbtiRecord>, Box<dyn Error>> {
 pub fn split_data(records: &[MbtiRecord], train_ratio: f64) -> (Vec<MbtiRecord>, Vec<MbtiRecord>) {
     use rand::seq::SliceRandom;
     use rand::thread_rng;
-    
+
     let mut shuffled = records.to_vec();
     let mut rng = thread_rng();
     shuffled.shuffle(&mut rng);
-    
+
     let train_size = (records.len() as f64 * train_ratio) as usize;
     let train_data = shuffled[..train_size].to_vec();
     let test_data = shuffled[train_size..].to_vec();
-    
+
     (train_data, test_data)
 }
 
@@ -114,14 +112,14 @@ impl BaselineClassifier {
     pub fn new() -> Self {
         Self { trained: false }
     }
-    
+
     /// Train the classifier on the given data
     pub fn train(&mut self, _records: &[MbtiRecord]) -> Result<(), Box<dyn Error>> {
         // Call into the baseline module's training logic
         self.trained = true;
         Ok(())
     }
-    
+
     /// Predict MBTI type for given text
     pub fn predict(&self, _text: &str) -> Result<String, Box<dyn Error>> {
         if !self.trained {
@@ -130,12 +128,12 @@ impl BaselineClassifier {
         // Call prediction logic
         Ok("INFP".to_string()) // Placeholder
     }
-    
+
     /// Save model to file
     pub fn save(&self, _path: &str) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
-    
+
     /// Load model from file
     pub fn load(_path: &str) -> Result<Self, Box<dyn Error>> {
         Ok(Self { trained: true })
@@ -158,13 +156,13 @@ impl PsyAttentionClassifier {
     pub fn new() -> Self {
         Self { trained: false }
     }
-    
+
     /// Train the classifier
     pub fn train(&mut self, _records: &[MbtiRecord]) -> Result<(), Box<dyn Error>> {
         self.trained = true;
         Ok(())
     }
-    
+
     /// Predict MBTI type
     pub fn predict(&self, _text: &str) -> Result<String, Box<dyn Error>> {
         if !self.trained {
@@ -192,13 +190,13 @@ impl BertClassifier {
     pub fn new() -> Result<Self, Box<dyn Error>> {
         Ok(Self { trained: false })
     }
-    
+
     /// Train the classifier
     pub fn train(&mut self, _records: &[MbtiRecord]) -> Result<(), Box<dyn Error>> {
         self.trained = true;
         Ok(())
     }
-    
+
     /// Predict MBTI type
     pub fn predict(&self, _text: &str) -> Result<String, Box<dyn Error>> {
         if !self.trained {
@@ -214,4 +212,3 @@ impl Default for BertClassifier {
         Self::new().unwrap()
     }
 }
-

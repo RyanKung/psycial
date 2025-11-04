@@ -23,7 +23,7 @@ pub fn main_psyattention_bert(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
     println!("║        rust-bert - Hugging Face Transformers              ║");
     println!("║                                                           ║");
     println!("╚═══════════════════════════════════════════════════════════╝\n");
-    
+
     println!("📄 Paper: PsyAttention (Zhang et al., 2023)");
     println!("🎯 Target: 86.30% accuracy");
     println!("🦀 Implementation: Rust API (libtorch backend)");
@@ -43,7 +43,11 @@ pub fn main_psyattention_bert(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
     let mut rdr = ReaderBuilder::new().has_headers(true).from_reader(file);
 
     let mut records: Vec<MbtiRecord> = rdr.deserialize().collect::<Result<_, _>>()?;
-    println!("   ✓ {} records ({:.2}s)\n", records.len(), start.elapsed().as_secs_f64());
+    println!(
+        "   ✓ {} records ({:.2}s)\n",
+        records.len(),
+        start.elapsed().as_secs_f64()
+    );
 
     // Shuffle and split
     let mut rng = thread_rng();
@@ -61,25 +65,28 @@ pub fn main_psyattention_bert(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
 
     // Create classifier
     let mut classifier = BertClassifier::new(108);
-    
+
     println!("🔧 Initializing Real BERT...");
     classifier.init_bert()?;
-    
+
     println!("═══════════════════════════════════════════════════════════");
 
     // Train
     let train_start = Instant::now();
     let train_texts: Vec<String> = train_records.iter().map(|r| r.posts.clone()).collect();
     let train_labels: Vec<String> = train_records.iter().map(|r| r.mbti_type.clone()).collect();
-    
+
     classifier.train(&train_texts, &train_labels)?;
-    
-    println!("⏱️  Training time: {:.2}s\n", train_start.elapsed().as_secs_f64());
+
+    println!(
+        "⏱️  Training time: {:.2}s\n",
+        train_start.elapsed().as_secs_f64()
+    );
     println!("═══════════════════════════════════════════════════════════\n");
 
     // Evaluate
     println!("📊 Evaluation\n");
-    
+
     println!("Training Set:");
     let eval_start = Instant::now();
     let mut correct = 0;
@@ -98,7 +105,7 @@ pub fn main_psyattention_bert(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
     let test_start = Instant::now();
     let test_texts: Vec<String> = test_records.iter().map(|r| r.posts.clone()).collect();
     let test_labels: Vec<String> = test_records.iter().map(|r| r.mbti_type.clone()).collect();
-    
+
     let mut correct = 0;
     for (text, label) in test_texts.iter().zip(test_labels.iter()) {
         if let Ok(pred) = classifier.predict(text) {
@@ -121,18 +128,21 @@ pub fn main_psyattention_bert(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
     println!("│ Random Guessing                            │   6.25%  │");
     println!("│ TF-IDF + Naive Bayes                       │  21.73%  │");
     println!("│ PsyAttention (930→108 features)            │  20.12%  │");
-    println!("│ PsyAttention + Real BERT (Pure Rust)       │ {:>6.2}%  │", test_acc * 100.0);
+    println!(
+        "│ PsyAttention + Real BERT (Pure Rust)       │ {:>6.2}%  │",
+        test_acc * 100.0
+    );
     println!("│ Paper Target (+ 8-layer Transformer)       │  86.30%  │");
     println!("└────────────────────────────────────────────┴──────────┘\n");
-    
+
     let vs_random = test_acc / 0.0625;
     let vs_paper = (test_acc / 0.8630) * 100.0;
-    
+
     println!("Analysis:");
     println!("   • {:.1}x better than random guessing", vs_random);
     println!("   • {:.1}% of paper target achieved", vs_paper);
     println!();
-    
+
     println!("🎉 Key Achievements:");
     println!("   ✓ Pure Rust implementation (no PyTorch)");
     println!("   ✓ Real BERT from Tract ONNX");
@@ -140,7 +150,7 @@ pub fn main_psyattention_bert(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
     println!("   ✓ Pearson feature selection");
     println!("   ✓ Dynamic fusion layer");
     println!();
-    
+
     if test_acc < 0.30 {
         println!("💡 Performance below expectations?");
         println!("   This may be due to:");
@@ -150,7 +160,7 @@ pub fn main_psyattention_bert(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
         println!("   • Limited data augmentation");
         println!();
     }
-    
+
     println!("═══════════════════════════════════════════════════════════\n");
     println!("🎊 Complete! Pure Rust MBTI classifier with real BERT.");
     println!();

@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use super::psychological_features::PsychologicalFeatureExtractor;
 use super::attention_encoder::WeightedAttentionEncoder;
+use super::psychological_features::PsychologicalFeatureExtractor;
 use std::collections::HashMap;
 use std::f64::consts::E;
 
@@ -9,7 +9,7 @@ use std::f64::consts::E;
 pub struct PsyAttentionClassifier {
     psy_extractor: PsychologicalFeatureExtractor,
     psy_encoder: WeightedAttentionEncoder,
-    
+
     // Naive Bayes parameters
     class_priors: HashMap<String, f64>,
     class_weights: HashMap<String, f64>,
@@ -29,10 +29,14 @@ impl PsyAttentionClassifier {
 
     /// Train the classifier on labeled data
     pub fn train(&mut self, texts: &[String], labels: &[String]) {
-        assert_eq!(texts.len(), labels.len(), "Texts and labels must have same length");
+        assert_eq!(
+            texts.len(),
+            labels.len(),
+            "Texts and labels must have same length"
+        );
 
         let n_samples = labels.len() as f64;
-        
+
         // Extract psychological features for all samples
         let psy_features: Vec<Vec<f64>> = texts
             .iter()
@@ -52,19 +56,19 @@ impl PsyAttentionClassifier {
         }
 
         let n_classes = class_counts.len() as f64;
-        
+
         // Calculate class weights (inverse of frequency for balancing)
         for (class, count) in &class_counts {
             let weight = (n_samples / (n_classes * *count as f64)).sqrt();
             self.class_weights.insert(class.clone(), weight);
-            
+
             let prior = *count as f64 / n_samples;
             self.class_priors.insert(class.clone(), prior);
         }
 
         // Calculate feature probabilities for each class
         for class in class_counts.keys() {
-            let mut feature_sums = vec![0.0; 9];
+            let mut feature_sums = [0.0; 9];
             let mut class_sample_count = 0;
 
             for (i, label) in labels.iter().enumerate() {
@@ -194,14 +198,14 @@ mod tests {
     #[test]
     fn test_train_and_predict() {
         let mut classifier = PsyAttentionClassifier::new();
-        
+
         let texts = vec![
             "I feel so happy and joyful today! Life is wonderful.".to_string(),
             "I am ashamed and guilty about my actions. I feel terrible.".to_string(),
             "I feel so happy and delighted! Everything is going great.".to_string(),
             "I am so sad and depressed. Nothing seems to go right.".to_string(),
         ];
-        
+
         let labels = vec![
             "ENFP".to_string(),
             "INFJ".to_string(),
@@ -224,9 +228,8 @@ mod tests {
     fn test_feature_analysis() {
         let classifier = PsyAttentionClassifier::new();
         let analysis = classifier.analyze_features("I am happy but also feel guilty.");
-        
+
         assert!(analysis.contains_key("wellbeing"));
         assert!(analysis.contains_key("guilt"));
     }
 }
-

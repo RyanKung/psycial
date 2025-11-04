@@ -1,21 +1,21 @@
 /// Unified CLI for MBTI Personality Prediction
 /// All models accessible via subcommands
-
 use std::env;
 use std::process;
 
 mod baseline;
+mod bert_mlp;
+mod bert_only;
+mod hybrid_tfidf_bert;
 mod neural_net;
 mod neural_net_advanced;
-mod bert_only;
-mod bert_mlp;
-mod hybrid_tfidf_bert;
-mod psyattention_full;
-mod psyattention_candle;
 mod psyattention;
+mod psyattention_candle;
+mod psyattention_full;
 
 fn print_help() {
-    println!("
+    println!(
+        "
 ╔══════════════════════════════════════════════════════════════════╗
 ║          MBTI Personality Prediction - Unified CLI              ║
 ╚══════════════════════════════════════════════════════════════════╝
@@ -58,22 +58,23 @@ OPTIONS:
 NOTES:
     - BERT features are enabled by default
     - To build without BERT: cargo build --no-default-features
-");
+"
+    );
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     if args.len() < 2 {
         print_help();
         process::exit(1);
     }
-    
+
     let subcommand = &args[1];
-    
+
     // Pass remaining args to subcommand
     let sub_args: Vec<String> = args.iter().skip(1).cloned().collect();
-    
+
     let result = match subcommand.as_str() {
         "baseline" => baseline::main_baseline(sub_args),
         "psyattention" => psyattention::main_psyattention(sub_args),
@@ -92,7 +93,7 @@ fn main() {
             process::exit(1);
         }
     };
-    
+
     if let Err(e) = result {
         eprintln!("Error: {}", e);
         process::exit(1);

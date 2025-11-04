@@ -1,5 +1,5 @@
 //! BERT-based classifier usage example
-//! 
+//!
 //! Run with: cargo run --example bert_usage --features bert
 
 #[cfg(feature = "bert")]
@@ -44,4 +44,3 @@ fn main() {
     eprintln!("Run with: cargo run --example bert_usage --features bert");
     std::process::exit(1);
 }
-

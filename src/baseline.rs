@@ -16,10 +16,9 @@ struct MbtiRecord {
 
 // Common stop words to filter out
 const STOP_WORDS: &[&str] = &[
-    "the", "and", "for", "are", "but", "not", "you", "all", "can", "her",
-    "was", "one", "our", "out", "this", "that", "with", "have", "from",
-    "they", "been", "were", "said", "each", "which", "she", "how", "their",
-    "will", "when", "make", "like", "him", "into", "time", "has", "look",
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "her", "was", "one", "our",
+    "out", "this", "that", "with", "have", "from", "they", "been", "were", "said", "each", "which",
+    "she", "how", "their", "will", "when", "make", "like", "him", "into", "time", "has", "look",
 ];
 
 // Text preprocessing
@@ -27,9 +26,9 @@ fn preprocess_text(text: &str) -> Vec<String> {
     let re = Regex::new(r"[^a-zA-Z\s]").unwrap();
     let lowercase = text.to_lowercase();
     let cleaned = re.replace_all(lowercase.as_str(), " ");
-    
+
     let stop_words: HashSet<&str> = STOP_WORDS.iter().cloned().collect();
-    
+
     cleaned
         .split_whitespace()
         .filter(|word| word.len() > 2 && !stop_words.contains(word)) // Remove short words and stop words
@@ -58,17 +57,29 @@ fn generate_trigrams(words: &[String]) -> Vec<String> {
 // Extract text statistics features
 fn extract_text_stats(text: &str) -> HashMap<String, f64> {
     let mut stats = HashMap::new();
-    
+
     // Length features
     stats.insert("text_length".to_string(), text.len() as f64);
-    stats.insert("word_count".to_string(), text.split_whitespace().count() as f64);
-    
+    stats.insert(
+        "word_count".to_string(),
+        text.split_whitespace().count() as f64,
+    );
+
     // Punctuation features
-    stats.insert("exclamation_count".to_string(), text.matches('!').count() as f64);
-    stats.insert("question_count".to_string(), text.matches('?').count() as f64);
-    stats.insert("ellipsis_count".to_string(), text.matches("...").count() as f64);
+    stats.insert(
+        "exclamation_count".to_string(),
+        text.matches('!').count() as f64,
+    );
+    stats.insert(
+        "question_count".to_string(),
+        text.matches('?').count() as f64,
+    );
+    stats.insert(
+        "ellipsis_count".to_string(),
+        text.matches("...").count() as f64,
+    );
     stats.insert("url_count".to_string(), text.matches("http").count() as f64);
-    
+
     // Average word length
     let words: Vec<&str> = text.split_whitespace().collect();
     let avg_word_len = if !words.is_empty() {
@@ -77,7 +88,7 @@ fn extract_text_stats(text: &str) -> HashMap<String, f64> {
         0.0
     };
     stats.insert("avg_word_length".to_string(), avg_word_len);
-    
+
     stats
 }
 
@@ -109,7 +120,7 @@ impl TfidfVectorizer {
         // Count word frequencies and document frequencies
         for doc in documents {
             let mut all_features = doc.clone();
-            
+
             // Add n-grams if enabled
             if self.use_bigrams {
                 let bigrams = generate_bigrams(doc);
@@ -119,7 +130,7 @@ impl TfidfVectorizer {
                 let trigrams = generate_trigrams(doc);
                 all_features.extend(trigrams);
             }
-            
+
             let unique_words: HashSet<String> = all_features.iter().cloned().collect();
             for word in &unique_words {
                 *word_doc_count.entry(word.clone()).or_insert(0) += 1;
@@ -132,7 +143,7 @@ impl TfidfVectorizer {
         // Select top features by frequency
         let mut word_counts: Vec<_> = word_total_count.iter().collect();
         word_counts.sort_by(|a, b| b.1.cmp(a.1));
-        
+
         self.vocabulary = word_counts
             .iter()
             .take(self.max_features)
@@ -150,7 +161,7 @@ impl TfidfVectorizer {
 
     fn transform(&self, document: &[String]) -> HashMap<String, f64> {
         let mut all_features = document.to_vec();
-        
+
         // Add n-grams if enabled
         if self.use_bigrams {
             let bigrams = generate_bigrams(document);
@@ -160,7 +171,7 @@ impl TfidfVectorizer {
             let trigrams = generate_trigrams(document);
             all_features.extend(trigrams);
         }
-        
+
         let mut tf_counts: HashMap<String, usize> = HashMap::new();
         let doc_len = all_features.len() as f64;
 
@@ -272,7 +283,7 @@ impl NaiveBayesClassifier {
                     }
                 }
             }
-            
+
             // Apply mild class weight adjustment
             if let Some(weight) = self.class_weights.get(class) {
                 score += weight.ln() * 0.3; // Gentle weight influence (30%)
@@ -306,7 +317,12 @@ struct Config {
 }
 
 impl Config {
-    fn new(max_features: usize, use_bigrams: bool, use_trigrams: bool, use_text_stats: bool) -> Self {
+    fn new(
+        max_features: usize,
+        use_bigrams: bool,
+        use_trigrams: bool,
+        use_text_stats: bool,
+    ) -> Self {
         Config {
             max_features,
             use_bigrams,
@@ -333,14 +349,19 @@ fn run_experiment(
         .collect();
 
     // Extract TF-IDF features
-    let mut vectorizer = TfidfVectorizer::new(config.max_features, config.use_bigrams, config.use_trigrams);
+    let mut vectorizer =
+        TfidfVectorizer::new(config.max_features, config.use_bigrams, config.use_trigrams);
     vectorizer.fit(&train_docs);
 
-    let mut train_features: Vec<HashMap<String, f64>> =
-        train_docs.iter().map(|doc| vectorizer.transform(doc)).collect();
+    let mut train_features: Vec<HashMap<String, f64>> = train_docs
+        .iter()
+        .map(|doc| vectorizer.transform(doc))
+        .collect();
 
-    let mut test_features: Vec<HashMap<String, f64>> =
-        test_docs.iter().map(|doc| vectorizer.transform(doc)).collect();
+    let mut test_features: Vec<HashMap<String, f64>> = test_docs
+        .iter()
+        .map(|doc| vectorizer.transform(doc))
+        .collect();
 
     // Add text statistics
     if config.use_text_stats {
@@ -350,7 +371,7 @@ fn run_experiment(
                 train_features[i].insert(format!("stat_{}", key), value / 1000.0);
             }
         }
-        
+
         for (i, record) in test_records.iter().enumerate() {
             let stats = extract_text_stats(&record.posts);
             for (key, value) in stats {
@@ -412,7 +433,7 @@ pub fn main_baseline(_args: Vec<String>) -> Result<(), Box<dyn Error>> {
 
     // Run multiple experiments
     println!("=== Running Experiments ===\n");
-    
+
     let experiments = vec![
         ("Baseline (1K)", Config::new(1000, false, false, false)),
         ("3K", Config::new(3000, false, false, false)),
@@ -427,8 +448,12 @@ pub fn main_baseline(_args: Vec<String>) -> Result<(), Box<dyn Error>> {
     for (name, config) in &experiments {
         print!("Testing: {:<35} ... ", name);
         let (train_acc, test_acc) = run_experiment(config, train_records, test_records)?;
-        println!("Train: {:.2}% | Test: {:.2}%", train_acc * 100.0, test_acc * 100.0);
-        
+        println!(
+            "Train: {:.2}% | Test: {:.2}%",
+            train_acc * 100.0,
+            test_acc * 100.0
+        );
+
         if test_acc > best_test_acc {
             best_test_acc = test_acc;
             best_config_name = name;
@@ -438,7 +463,7 @@ pub fn main_baseline(_args: Vec<String>) -> Result<(), Box<dyn Error>> {
     println!("\n=== Best Configuration ===");
     println!("Configuration: {}", best_config_name);
     println!("Test Accuracy: {:.2}%", best_test_acc * 100.0);
-    
+
     println!("\n=== Training Complete ===");
 
     Ok(())
