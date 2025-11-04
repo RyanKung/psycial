@@ -23,19 +23,24 @@ impl RustBertEncoder {
         println!("   Model: all-MiniLM-L6-v2 (sentence-transformers)");
         println!("   Backend: libtorch (PyTorch C++)");
         
-        // Detect and use GPU if available
-        let device = if tch::Cuda::is_available() {
-            let gpu_id = std::env::var("CUDA_VISIBLE_DEVICES")
-                .ok()
-                .and_then(|s| s.split(',').next().and_then(|id| id.parse::<usize>().ok()))
-                .unwrap_or(0);
-            Device::Cuda(gpu_id)
+        // Detailed CUDA diagnostics
+        println!("\n🔍 CUDA Diagnostics:");
+        println!("   CUDA available: {}", tch::Cuda::is_available());
+        println!("   CUDA device count: {}", tch::Cuda::device_count());
+        println!("   cuDNN available: {}", tch::Cuda::cudnn_is_available());
+        
+        // Force GPU usage
+        let device = if tch::Cuda::device_count() > 0 {
+            // CUDA_VISIBLE_DEVICES=1 makes GPU 1 appear as device 0
+            let device_id = 0;
+            println!("   Using GPU device: {} (mapped from CUDA_VISIBLE_DEVICES)", device_id);
+            Device::Cuda(device_id)
         } else {
+            println!("   ⚠️  No CUDA devices found, falling back to CPU");
             Device::Cpu
         };
         
-        println!("   Device: {:?}", device);
-        println!("   Downloading model on first run...\n");
+        println!("   Final device: {:?}\n", device);
 
         // Use MiniLM with explicit device
         let model = SentenceEmbeddingsBuilder::remote(SentenceEmbeddingsModelType::AllMiniLmL12V2)
