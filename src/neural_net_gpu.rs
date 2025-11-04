@@ -185,6 +185,14 @@ impl GpuMLP {
         })
     }
 
+    /// Batch prediction
+    pub fn predict_batch(&self, features_batch: &[Vec<f64>]) -> Vec<String> {
+        features_batch
+            .iter()
+            .map(|features| self.predict(features))
+            .collect()
+    }
+
     #[allow(dead_code)]
     pub fn num_layers(&self) -> usize {
         // Approximate based on hidden layers

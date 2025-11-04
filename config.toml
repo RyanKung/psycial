@@ -1,0 +1,49 @@
+# Psycial - MBTI Classifier Configuration
+
+[data]
+# Path to training data
+csv_path = "data/mbti_1.csv"
+# Train/test split ratio (0.8 = 80% train, 20% test)
+train_split = 0.8
+
+[features]
+# Maximum number of TF-IDF features
+max_tfidf_features = 5000
+# BERT model automatically provides 384 dimensions
+
+[model]
+# Model type: "single" (16-way classification) or "multitask" (4 x 2-way classification)
+# Multitask is more aligned with MBTI theory and often achieves better results
+model_type = "multitask"
+
+# Network architecture (hidden layer sizes)
+hidden_layers = [1024, 512, 256]
+# Learning rate for Adam optimizer
+learning_rate = 0.001
+# Dropout rate for regularization (0.0-1.0)
+# Higher values = stronger regularization, less overfitting
+dropout_rate = 0.5
+
+[training]
+# Number of training epochs
+epochs = 25
+# Batch size for training
+batch_size = 64
+# BERT batch processing size
+bert_batch_size = 64
+
+[output]
+# Directory to save trained models
+model_dir = "models"
+# Model file names (base names, suffix will be added automatically)
+# Multi-task models: *_multitask.json, *_multitask.pt
+# Single-task models: *_single.json, *_single.pt, class_mapping_single.json
+tfidf_file = "tfidf_vectorizer.json"
+mlp_file = "mlp_weights.pt"
+class_mapping_file = "class_mapping.json"
+
+# Experiment notes:
+# - dropout_rate 0.5 with epochs 25: Good balance, test ~49%
+# - dropout_rate 0.6 with epochs 20: Stronger regularization
+# - dropout_rate 0.4 with epochs 40: Overfitting (train 99%, test 49%)
+

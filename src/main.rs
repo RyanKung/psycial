@@ -10,6 +10,7 @@ mod hybrid_tfidf_bert;
 mod neural_net;
 mod neural_net_advanced;
 mod neural_net_gpu;
+mod neural_net_gpu_multitask;
 mod psyattention;
 mod psyattention_candle;
 mod psyattention_full;

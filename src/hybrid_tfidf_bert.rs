@@ -1,4 +1,5 @@
 use crate::neural_net_gpu::GpuMLP;
+use crate::neural_net_gpu_multitask::MultiTaskGpuMLP;
 use crate::psyattention::bert_rustbert::RustBertEncoder;
 
 use csv::ReaderBuilder;
@@ -9,6 +10,58 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::time::Instant;
+
+// Configuration structures
+#[derive(Debug, Deserialize)]
+struct Config {
+    data: DataConfig,
+    features: FeaturesConfig,
+    model: ModelConfig,
+    training: TrainingConfig,
+    output: OutputConfig,
+}
+
+#[derive(Debug, Deserialize)]
+struct DataConfig {
+    csv_path: String,
+    train_split: f64,
+}
+
+#[derive(Debug, Deserialize)]
+struct FeaturesConfig {
+    max_tfidf_features: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModelConfig {
+    model_type: String, // "single" or "multitask"
+    hidden_layers: Vec<i64>,
+    learning_rate: f64,
+    dropout_rate: f64,
+}
+
+#[derive(Debug, Deserialize)]
+struct TrainingConfig {
+    epochs: i64,
+    batch_size: i64,
+    bert_batch_size: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct OutputConfig {
+    model_dir: String,
+    tfidf_file: String,
+    mlp_file: String,
+    class_mapping_file: String,
+}
+
+impl Config {
+    fn load(path: &str) -> Result<Self, Box<dyn Error>> {
+        let content = std::fs::read_to_string(path)?;
+        let config: Config = toml::from_str(&content)?;
+        Ok(config)
+    }
+}
 
 #[derive(Debug, Deserialize, Clone)]
 struct MbtiRecord {
@@ -171,19 +224,81 @@ pub fn main_hybrid(args: Vec<String>) -> Result<(), Box<dyn Error>> {
 }
 
 fn train_model() -> Result<(), Box<dyn Error>> {
+    // Load configuration
+    let config = Config::load("config.toml").unwrap_or_else(|e| {
+        eprintln!("Warning: Could not load config.toml: {}", e);
+        eprintln!("Using default configuration\n");
+        Config {
+            data: DataConfig {
+                csv_path: "data/mbti_1.csv".to_string(),
+                train_split: 0.8,
+            },
+            features: FeaturesConfig {
+                max_tfidf_features: 5000,
+            },
+            model: ModelConfig {
+                model_type: "multitask".to_string(),
+                hidden_layers: vec![1024, 512, 256],
+                learning_rate: 0.001,
+                dropout_rate: 0.5,
+            },
+            training: TrainingConfig {
+                epochs: 25,
+                batch_size: 64,
+                bert_batch_size: 64,
+            },
+            output: OutputConfig {
+                model_dir: "models".to_string(),
+                tfidf_file: "tfidf_vectorizer.json".to_string(),
+                mlp_file: "mlp_weights.pt".to_string(),
+                class_mapping_file: "class_mapping.json".to_string(),
+            },
+        }
+    });
+
     println!("\n===================================================================");
     println!("  MBTI Classifier: GPU-Accelerated Hybrid Model");
     println!("  TF-IDF + BERT + GPU MLP");
     println!("===================================================================\n");
 
-    println!("Strategy: Combine statistical (TF-IDF) and semantic (BERT) features");
-    println!("Classifier: GPU-Accelerated MLP with Adam optimizer and Dropout\n");
+    println!("Configuration:");
+    println!("  Data: {}", config.data.csv_path);
+    println!(
+        "  Train/Test split: {:.0}%/{:.0}%",
+        config.data.train_split * 100.0,
+        (1.0 - config.data.train_split) * 100.0
+    );
+    println!("  TF-IDF features: {}", config.features.max_tfidf_features);
+    println!(
+        "  Model type: {} {}",
+        config.model.model_type,
+        if config.model.model_type == "multitask" {
+            "(4 binary classifiers: E/I, S/N, T/F, J/P)"
+        } else {
+            "(16-way classification)"
+        }
+    );
+    let output_desc = if config.model.model_type == "multitask" {
+        "4×2"
+    } else {
+        "16"
+    };
+    println!(
+        "  Architecture: {} -> {:?} -> {}",
+        config.features.max_tfidf_features + 384,
+        config.model.hidden_layers,
+        output_desc
+    );
+    println!("  Learning rate: {}", config.model.learning_rate);
+    println!("  Dropout: {}", config.model.dropout_rate);
+    println!("  Epochs: {}", config.training.epochs);
+    println!("  Batch size: {}\n", config.training.batch_size);
     println!("===================================================================\n");
 
     // Load data
     println!("Loading dataset...");
     let start = Instant::now();
-    let file = File::open("data/mbti_1.csv")?;
+    let file = File::open(&config.data.csv_path)?;
     let mut rdr = ReaderBuilder::new().has_headers(true).from_reader(file);
     let mut records: Vec<MbtiRecord> = rdr.deserialize().collect::<Result<_, _>>()?;
     println!(
@@ -195,7 +310,7 @@ fn train_model() -> Result<(), Box<dyn Error>> {
     // Shuffle and split
     let mut rng = thread_rng();
     records.shuffle(&mut rng);
-    let split = (records.len() as f64 * 0.8) as usize;
+    let split = (records.len() as f64 * config.data.train_split) as usize;
     let train_records = &records[..split];
     let test_records = &records[split..];
 
@@ -268,44 +383,115 @@ fn train_model() -> Result<(), Box<dyn Error>> {
         train_features.push(combined);
     }
 
-    println!("\nTraining GPU-Accelerated MLP...");
-    println!("  Input: 5384 features (5000 TF-IDF + 384 BERT)");
-    println!("  Architecture: 5384 -> 1024 -> 512 -> 256 -> 16");
-    println!("  Optimizer: Adam");
-    println!("  Learning rate: 0.001");
-    println!("  Dropout: 0.4");
-    println!("  Epochs: 40\n");
-
-    let mut mlp = GpuMLP::new(
-        5384,                 // 5K TF-IDF + BERT
-        vec![1024, 512, 256], // Deeper network
-        16,                   // MBTI types
-        0.001,                // Learning rate
-        0.4,                  // Higher dropout for regularization
+    println!(
+        "\nTraining GPU-Accelerated MLP ({})...",
+        config.model.model_type
     );
+    let input_dim = config.features.max_tfidf_features + 384;
+    println!(
+        "  Input: {} features ({} TF-IDF + 384 BERT)",
+        input_dim, config.features.max_tfidf_features
+    );
+    println!(
+        "  Architecture: {} -> {:?} -> {}",
+        input_dim, config.model.hidden_layers, output_desc
+    );
+    println!("  Optimizer: Adam");
+    println!("  Learning rate: {}", config.model.learning_rate);
+    println!("  Dropout: {}", config.model.dropout_rate);
+    println!("  Epochs: {}\n", config.training.epochs);
 
-    mlp.train(&train_features, &train_labels, 40, 64);
+    // Choose model based on configuration
+    if config.model.model_type == "multitask" {
+        let mut mlp = MultiTaskGpuMLP::new(
+            input_dim as i64,
+            config.model.hidden_layers.clone(),
+            config.model.learning_rate,
+            config.model.dropout_rate,
+        );
 
+        mlp.train(
+            &train_features,
+            &train_labels,
+            config.training.epochs,
+            config.training.batch_size,
+        );
+
+        // Continue with multitask evaluation below
+        evaluate_multitask_model(
+            &mlp,
+            &train_features,
+            &train_labels,
+            &test_records,
+            &tfidf,
+            &bert_encoder,
+            train_start,
+            &config,
+        )?;
+    } else {
+        let mut mlp = GpuMLP::new(
+            input_dim as i64,
+            config.model.hidden_layers.clone(),
+            16, // 16 MBTI types
+            config.model.learning_rate,
+            config.model.dropout_rate,
+        );
+
+        mlp.train(
+            &train_features,
+            &train_labels,
+            config.training.epochs,
+            config.training.batch_size,
+        );
+
+        // Continue with single-task evaluation below
+        evaluate_singletask_model(
+            &mlp,
+            &train_features,
+            &train_labels,
+            &test_records,
+            &tfidf,
+            &bert_encoder,
+            train_start,
+            &config,
+        )?;
+    }
+
+    Ok(())
+}
+
+// Evaluation function for multi-task model
+fn evaluate_multitask_model(
+    mlp: &MultiTaskGpuMLP,
+    train_features: &[Vec<f64>],
+    train_labels: &[String],
+    test_records: &[MbtiRecord],
+    tfidf: &TfidfVectorizer,
+    bert_encoder: &RustBertEncoder,
+    train_start: Instant,
+    config: &Config,
+) -> Result<(), Box<dyn Error>> {
     println!(
         "\nTotal training time: {:.2}s\n",
         train_start.elapsed().as_secs_f64()
     );
     println!("===================================================================\n");
 
-    // Evaluate
     println!("Evaluation\n");
 
+    // Training Set Evaluation
     println!("Training Set:");
+    let train_predictions = mlp.predict_batch(train_features);
     let mut correct = 0;
-    for (feat, label) in train_features.iter().zip(train_labels.iter()) {
-        let pred = mlp.predict(feat);
-        if pred == *label {
+    for (pred, label) in train_predictions.iter().zip(train_labels.iter()) {
+        if pred == label {
             correct += 1;
         }
     }
     let train_acc = correct as f64 / train_labels.len() as f64;
     println!("  Accuracy: {:.2}%\n", train_acc * 100.0);
 
+    // Test Set Evaluation
     println!("Test Set:");
     let test_start = Instant::now();
     let test_texts: Vec<String> = test_records.iter().map(|r| r.posts.clone()).collect();
@@ -316,19 +502,17 @@ fn train_model() -> Result<(), Box<dyn Error>> {
         if (i + 1) % 500 == 0 {
             println!("  Test: {}/{}", i + 1, test_texts.len());
         }
-
         let tfidf_feat = tfidf.transform(text);
         let bert_feat = bert_encoder.extract_features(text)?;
-
         let mut combined = tfidf_feat;
         combined.extend(bert_feat);
         test_features.push(combined);
     }
 
+    let test_predictions = mlp.predict_batch(&test_features);
     let mut correct = 0;
-    for (feat, label) in test_features.iter().zip(test_labels.iter()) {
-        let pred = mlp.predict(feat);
-        if pred == *label {
+    for (pred, label) in test_predictions.iter().zip(test_labels.iter()) {
+        if pred == label {
             correct += 1;
         }
     }
@@ -336,18 +520,97 @@ fn train_model() -> Result<(), Box<dyn Error>> {
     println!("  Accuracy: {:.2}%", test_acc * 100.0);
     println!("  Time: {:.2}s\n", test_start.elapsed().as_secs_f64());
 
+    print_results(test_acc);
+
+    // Save model
+    save_model(mlp, tfidf, &config.output)?;
+
+    Ok(())
+}
+
+// Evaluation function for single-task model
+fn evaluate_singletask_model(
+    mlp: &GpuMLP,
+    train_features: &[Vec<f64>],
+    train_labels: &[String],
+    test_records: &[MbtiRecord],
+    tfidf: &TfidfVectorizer,
+    bert_encoder: &RustBertEncoder,
+    train_start: Instant,
+    config: &Config,
+) -> Result<(), Box<dyn Error>> {
+    println!(
+        "\nTotal training time: {:.2}s\n",
+        train_start.elapsed().as_secs_f64()
+    );
+    println!("===================================================================\n");
+
+    println!("Evaluation\n");
+
+    // Training Set Evaluation
+    println!("Training Set:");
+    let train_predictions = mlp.predict_batch(train_features);
+    let mut correct = 0;
+    for (pred, label) in train_predictions.iter().zip(train_labels.iter()) {
+        if pred == label {
+            correct += 1;
+        }
+    }
+    let train_acc = correct as f64 / train_labels.len() as f64;
+    println!("  Accuracy: {:.2}%\n", train_acc * 100.0);
+
+    // Test Set Evaluation
+    println!("Test Set:");
+    let test_start = Instant::now();
+    let test_texts: Vec<String> = test_records.iter().map(|r| r.posts.clone()).collect();
+    let test_labels: Vec<String> = test_records.iter().map(|r| r.mbti_type.clone()).collect();
+
+    let mut test_features = Vec::new();
+    for (i, text) in test_texts.iter().enumerate() {
+        if (i + 1) % 500 == 0 {
+            println!("  Test: {}/{}", i + 1, test_texts.len());
+        }
+        let tfidf_feat = tfidf.transform(text);
+        let bert_feat = bert_encoder.extract_features(text)?;
+        let mut combined = tfidf_feat;
+        combined.extend(bert_feat);
+        test_features.push(combined);
+    }
+
+    let test_predictions = mlp.predict_batch(&test_features);
+    let mut correct = 0;
+    for (pred, label) in test_predictions.iter().zip(test_labels.iter()) {
+        if pred == label {
+            correct += 1;
+        }
+    }
+    let test_acc = correct as f64 / test_labels.len() as f64;
+    println!("  Accuracy: {:.2}%", test_acc * 100.0);
+    println!("  Time: {:.2}s\n", test_start.elapsed().as_secs_f64());
+
+    print_results(test_acc);
+
+    // Save model
+    save_model_singletask(mlp, tfidf, &config.output)?;
+
+    Ok(())
+}
+
+// Helper function to print results
+fn print_results(test_acc: f64) {
     println!("===================================================================\n");
     println!("Final Results\n");
     println!("+--------------------------------------------+----------+");
     println!("| Method                                     | Accuracy |");
     println!("+--------------------------------------------+----------+");
     println!("| Baseline (TF-IDF + Naive Bayes)            |  21.73%  |");
-    println!("| BERT + MLP                                 |  31.99%  |");
+    println!("| BERT + MLP (single-task)                   |  31.99%  |");
+    println!("| Hybrid (single-task, previous)             |  49.16%  |");
     println!(
-        "| TF-IDF + BERT + Advanced MLP (Hybrid)      | {:>6.2}%  |",
+        "| Hybrid (current)                           | {:>6.2}%  |",
         test_acc * 100.0
     );
-    println!("| Paper Target (BERT + 8-layer Transformer)  |  86.30%  |");
+    println!("| Paper Target (BERT + Transformer)          |  86.30%  |");
     println!("+--------------------------------------------+----------+\n");
 
     let improvement = (test_acc - 0.2173) / 0.2173 * 100.0;
@@ -358,31 +621,84 @@ fn train_model() -> Result<(), Box<dyn Error>> {
     println!("  Progress toward paper: {:.1}%", vs_paper);
     println!("  vs Random: {:.1}x better\n", test_acc / 0.0625);
 
-    if test_acc > 0.35 {
-        println!("EXCELLENT: Significant improvement with hybrid approach!");
-    } else if test_acc > 0.32 {
-        println!("SUCCESS: Hybrid features show promise");
+    if test_acc > 0.55 {
+        println!("🎉 OUTSTANDING: Multi-task approach showing excellent results!");
+    } else if test_acc > 0.48 {
+        println!("✅ EXCELLENT: Significant improvement!");
+    } else if test_acc > 0.35 {
+        println!("👍 GOOD: Hybrid approach working well");
+    } else if test_acc > 0.30 {
+        println!("📊 SUCCESS: Above BERT-only baseline");
     } else {
-        println!("NOTE: TF-IDF + BERT combination at expected level");
+        println!("📝 NOTE: Results at expected level");
     }
 
     println!("\n===================================================================\n");
+}
 
-    // Save model
-    std::fs::create_dir_all("models")?;
+// Save multi-task model
+fn save_model(
+    mlp: &MultiTaskGpuMLP,
+    tfidf: &TfidfVectorizer,
+    output: &OutputConfig,
+) -> Result<(), Box<dyn Error>> {
+    std::fs::create_dir_all(&output.model_dir)?;
 
     println!("Saving model...");
-    tfidf.save("models/tfidf_vectorizer.json")?;
-    mlp.save("models/mlp_weights.pt")?;
-    mlp.save_class_mapping("models/class_mapping.json")?;
+    
+    // Add suffix for multi-task models
+    let tfidf_file = output.tfidf_file.replace(".json", "_multitask.json");
+    let mlp_file = output.mlp_file.replace(".pt", "_multitask.pt");
+    
+    let tfidf_path = format!("{}/{}", output.model_dir, tfidf_file);
+    let mlp_path = format!("{}/{}", output.model_dir, mlp_file);
 
-    println!("\n✓ Model saved:");
-    println!("  - models/tfidf_vectorizer.json");
-    println!("  - models/mlp_weights.pt");
-    println!("  - models/class_mapping.json");
+    tfidf.save(&tfidf_path)?;
+    mlp.save(&mlp_path)?;
+
+    println!("\n✓ Multi-Task Model saved:");
+    println!("  - {}", tfidf_path);
+    println!("  - {}", mlp_path);
 
     println!("\n===================================================================\n");
     println!("Training complete!\n");
+    println!("Note: Multi-task model uses different files to avoid conflicts.");
+    println!("To predict: ./target/release/psycial hybrid predict \"your text here\"\n");
+
+    Ok(())
+}
+
+// Save single-task model
+fn save_model_singletask(
+    mlp: &GpuMLP,
+    tfidf: &TfidfVectorizer,
+    output: &OutputConfig,
+) -> Result<(), Box<dyn Error>> {
+    std::fs::create_dir_all(&output.model_dir)?;
+
+    println!("Saving model...");
+    
+    // Add suffix for single-task models
+    let tfidf_file = output.tfidf_file.replace(".json", "_single.json");
+    let mlp_file = output.mlp_file.replace(".pt", "_single.pt");
+    let class_file = output.class_mapping_file.replace(".json", "_single.json");
+    
+    let tfidf_path = format!("{}/{}", output.model_dir, tfidf_file);
+    let mlp_path = format!("{}/{}", output.model_dir, mlp_file);
+    let class_path = format!("{}/{}", output.model_dir, class_file);
+
+    tfidf.save(&tfidf_path)?;
+    mlp.save(&mlp_path)?;
+    mlp.save_class_mapping(&class_path)?;
+
+    println!("\n✓ Single-Task Model saved:");
+    println!("  - {}", tfidf_path);
+    println!("  - {}", mlp_path);
+    println!("  - {}", class_path);
+
+    println!("\n===================================================================\n");
+    println!("Training complete!\n");
+    println!("Note: Single-task model uses different files to avoid conflicts.");
     println!("To predict: ./target/release/psycial hybrid predict \"your text here\"\n");
 
     Ok(())
