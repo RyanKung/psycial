@@ -24,10 +24,11 @@ console = { version = "0.16", features = ["std"] }
 
 # Deep learning dependencies  
 rust-bert = { version = "0.22", optional = true, features = ["download-libtorch"] }
+tch = { version = "0.14", optional = true }
 
 [features]
 default = ["bert"]
-bert = ["rust-bert"]
+bert = ["rust-bert", "tch"]
 
 [[bin]]
 name = "psycial"
