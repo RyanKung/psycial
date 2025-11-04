@@ -1,6 +1,5 @@
-mod psyattention;
-mod neural_net_advanced;
-
+use crate::psyattention;
+use crate::neural_net_advanced;
 use csv::ReaderBuilder;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -171,9 +170,7 @@ fn print_usage() {
     println!("  cargo run --release --features bert --bin psycial -- predict --model models/psycial_model.json --text \"I love coding\"");
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = std::env::args().collect();
-    
+pub fn main_hybrid(args: Vec<String>) -> Result<(), Box<dyn Error>> {
     // Parse command
     let command = if args.len() > 1 { &args[1] } else { "train" };
     

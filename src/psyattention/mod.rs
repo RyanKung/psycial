@@ -12,3 +12,7 @@ pub mod taaco;
 pub mod taales;
 pub mod full_features;
 pub mod fusion_layer;
+
+// Main entry point for simple psyattention
+pub mod simple;
+pub use simple::main_psyattention;

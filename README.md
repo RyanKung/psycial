@@ -25,25 +25,49 @@
 
 ## Quick Start
 
-### Best Model (BERT + Neural Network)
+### As a CLI Tool
 
 ```bash
-# First-time setup (downloads libtorch ~500MB, takes 60 mins)
-cargo build --release --features bert --bin bert-mlp
+# Show all available models
+cargo run --release
 
-# Run (after setup)
-cargo run --release --features bert --bin bert-mlp
+# Run baseline model
+cargo run --release -- baseline
+
+# Run BERT model
+cargo run --release -- bert-mlp
 ```
 
-**Output**: 31.99% accuracy, 47% better than statistical baseline
+See [CLI_GUIDE.md](CLI_GUIDE.md) for detailed CLI usage.
 
-### Fast Baseline (No BERT required)
+### As a Library
 
-```bash
-cargo run --release --bin baseline
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+psycial = { git = "https://github.com/yourusername/psycial" }
 ```
 
-**Output**: 21.73% accuracy, runs in 2 seconds
+Use in your code:
+
+```rust
+use psycial::{load_data, BaselineClassifier};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let records = load_data("data/mbti_1.csv")?;
+    
+    let mut classifier = BaselineClassifier::new();
+    classifier.train(&records)?;
+    
+    let prediction = classifier.predict("I love coding")?;
+    println!("Predicted type: {}", prediction);
+    
+    Ok(())
+}
+```
+
+See [LIBRARY_USAGE.md](LIBRARY_USAGE.md) for detailed library integration examples.
 
 ---
 

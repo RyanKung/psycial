@@ -1,5 +1,4 @@
-mod psyattention;
-
+use crate::psyattention;
 use csv::ReaderBuilder;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -18,7 +17,7 @@ struct MbtiRecord {
     posts: String,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub fn main_bert_only(_args: Vec<String>) -> Result<(), Box<dyn Error>> {
     println!("\n╔═══════════════════════════════════════════════════════════╗");
     println!("║                                                           ║");
     println!("║        🤖 MBTI Classifier - Pure BERT Features           ║");

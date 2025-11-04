@@ -1,6 +1,5 @@
-mod psyattention;
-mod neural_net;
-
+use crate::psyattention;
+use crate::neural_net;
 use csv::ReaderBuilder;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -19,7 +18,7 @@ struct MbtiRecord {
     posts: String,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub fn main_bert_mlp(_args: Vec<String>) -> Result<(), Box<dyn Error>> {
     println!("\n===================================================================");
     println!("  MBTI Classifier: BERT + Neural Network");
     println!("  Engineering approach for maximum performance");

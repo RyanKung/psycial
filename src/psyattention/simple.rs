@@ -1,7 +1,5 @@
-mod psychological_features;
-mod attention_encoder;
-mod classifier;
-
+use super::psychological_features::PsychologicalFeatureExtractor;
+use super::classifier::PsyAttentionClassifier;
 use csv::ReaderBuilder;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -9,9 +7,6 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
-
-use classifier::PsyAttentionClassifier;
-use psychological_features::PsychologicalFeatureExtractor;
 
 #[derive(Debug, Deserialize, Clone)]
 struct MbtiRecord {

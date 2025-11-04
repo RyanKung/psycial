@@ -49,6 +49,7 @@ impl RustBertEncoder {
     }
     
     /// Batch extract features for multiple texts (more efficient)
+    #[allow(dead_code)]
     pub fn extract_features_batch(&self, texts: &[String]) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
         let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
         
@@ -62,6 +63,7 @@ impl RustBertEncoder {
             .collect())
     }
     
+    #[allow(dead_code)]
     pub fn embedding_dim(&self) -> usize {
         384  // all-MiniLM-L12-v2 dimension
     }

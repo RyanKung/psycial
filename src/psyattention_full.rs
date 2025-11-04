@@ -1,5 +1,4 @@
-mod psyattention;
-
+use crate::psyattention;
 use csv::ReaderBuilder;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -27,7 +26,7 @@ fn calculate_accuracy(predictions: &[String], actual: &[String]) -> f64 {
     correct as f64 / predictions.len() as f64
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub fn main_psyattention_full(_args: Vec<String>) -> Result<(), Box<dyn Error>> {
     println!("╔═══════════════════════════════════════════════════════════════╗");
     println!("║  PsyAttention - FULL Implementation (930 Features)            ║");
     println!("╚═══════════════════════════════════════════════════════════════╝\n");
