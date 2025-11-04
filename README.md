@@ -1,10 +1,14 @@
-# MBTI Personality Classifier
+<div align="center">
+  <img src="logo.png" alt="Psycial Logo" width="200"/>
+  
+  # MBTI Personality Classifier
 
-[![Rust](https://img.shields.io/badge/Rust-100%25-orange)](https://www.rust-lang.org/)
-[![Accuracy](https://img.shields.io/badge/Best-31.99%25-success)](https://github.com)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+  [![Rust](https://img.shields.io/badge/Rust-100%25-orange)](https://www.rust-lang.org/)
+  [![Accuracy](https://img.shields.io/badge/Best-31.99%25-success)](https://github.com)
+  [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Production-grade MBTI personality classification system** with neural network implementation in pure Rust.
+  **Production-grade MBTI personality classification system** with neural network implementation in pure Rust.
+</div>
 
 ---
 
