@@ -27,7 +27,7 @@ impl RustBertEncoder {
         let device = if tch::Cuda::is_available() {
             let gpu_id = std::env::var("CUDA_VISIBLE_DEVICES")
                 .ok()
-                .and_then(|s| s.split(',').next().and_then(|id| id.parse::<i64>().ok()))
+                .and_then(|s| s.split(',').next().and_then(|id| id.parse::<usize>().ok()))
                 .unwrap_or(0);
             Device::Cuda(gpu_id)
         } else {
