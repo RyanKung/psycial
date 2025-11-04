@@ -6,6 +6,9 @@ use rust_bert::pipelines::sentence_embeddings::{
     SentenceEmbeddingsBuilder, SentenceEmbeddingsModelType,
 };
 
+#[cfg(feature = "bert")]
+use tch::Device;
+
 use std::error::Error;
 
 #[cfg(feature = "bert")]
@@ -19,10 +22,24 @@ impl RustBertEncoder {
         println!("🦀 Loading Real BERT (rust-bert library)...");
         println!("   Model: all-MiniLM-L6-v2 (sentence-transformers)");
         println!("   Backend: libtorch (PyTorch C++)");
+        
+        // Detect and use GPU if available
+        let device = if tch::Cuda::is_available() {
+            let gpu_id = std::env::var("CUDA_VISIBLE_DEVICES")
+                .ok()
+                .and_then(|s| s.split(',').next().and_then(|id| id.parse::<i64>().ok()))
+                .unwrap_or(0);
+            Device::Cuda(gpu_id)
+        } else {
+            Device::Cpu
+        };
+        
+        println!("   Device: {:?}", device);
         println!("   Downloading model on first run...\n");
 
-        // Use MiniLM - smaller but better for this task
+        // Use MiniLM with explicit device
         let model = SentenceEmbeddingsBuilder::remote(SentenceEmbeddingsModelType::AllMiniLmL12V2)
+            .with_device(device)
             .create_model()
             .map_err(|e| format!("Model creation failed: {}", e))?;
 
