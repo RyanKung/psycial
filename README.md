@@ -309,7 +309,7 @@ rust-bert = { version = "0.22", optional = true, features = ["download-libtorch"
 ```bibtex
 @software{snapMBTI2025,
   title={MBTI Personality Classifier with Neural Networks},
-  author={Ryan @ Farcaster},
+  author={Ryan Kung},
   year={2025},
   note={Pure Rust, 31.99\% accuracy, BERT + MLP implementation}
 }
