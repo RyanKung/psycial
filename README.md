@@ -50,22 +50,32 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-psycial = { git = "https://github.com/yourusername/psycial" }
+psycial = { git = "https://github.com/yourusername/psycial", features = ["bert"] }
 ```
 
 Use in your code:
 
 ```rust
-use psycial::{load_data, BaselineClassifier};
+use psycial::{load_data, MultiTaskGpuMLP, RustBertEncoder};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load data and initialize BERT
     let records = load_data("data/mbti_1.csv")?;
+    let bert = RustBertEncoder::new()?;
     
-    let mut classifier = BaselineClassifier::new();
-    classifier.train(&records)?;
+    // Extract features
+    let texts: Vec<String> = records.iter().map(|r| r.posts.clone()).collect();
+    let labels: Vec<String> = records.iter().map(|r| r.mbti_type.clone()).collect();
+    let features = bert.extract_features_batch(&texts)?;
     
-    let prediction = classifier.predict("I love coding")?;
-    println!("Predicted type: {}", prediction);
+    // Train multi-task model (4 binary classifiers: E/I, S/N, T/F, J/P)
+    let mut model = MultiTaskGpuMLP::new(384, vec![256, 128], 0.001, 0.5);
+    model.train(&features, &labels, 20, 32);
+    
+    // Predict
+    let test_features = bert.extract_features("I love planning everything.")?;
+    let mbti_type = model.predict(&test_features);
+    println!("Predicted: {}", mbti_type);
     
     Ok(())
 }

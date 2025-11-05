@@ -46,6 +46,14 @@ use serde::Deserialize;
 use std::error::Error;
 use std::fs::File;
 
+// Public API exports for library usage
+#[cfg(feature = "bert")]
+pub use neural_net_gpu::GpuMLP;
+#[cfg(feature = "bert")]
+pub use neural_net_gpu_multitask::MultiTaskGpuMLP;
+#[cfg(feature = "bert")]
+pub use psyattention::bert_rustbert::RustBertEncoder;
+
 /// MBTI record structure
 #[derive(Debug, Deserialize, Clone)]
 pub struct MbtiRecord {

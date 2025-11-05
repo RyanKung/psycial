@@ -1,6 +1,5 @@
 /// Multi-task GPU-accelerated MLP for MBTI 4-dimension prediction
 /// Each dimension (E/I, S/N, T/F, J/P) is predicted independently
-use std::collections::HashMap;
 use std::error::Error;
 
 #[cfg(feature = "bert")]
@@ -275,6 +274,7 @@ impl MultiTaskGpuMLP {
     }
 
     /// Load model weights
+    #[allow(dead_code)]
     pub fn load(
         path: &str,
         input_dim: i64,

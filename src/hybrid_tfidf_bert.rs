@@ -44,6 +44,7 @@ struct ModelConfig {
 struct TrainingConfig {
     epochs: i64,
     batch_size: i64,
+    #[allow(dead_code)]
     bert_batch_size: usize,
 }
 
@@ -418,16 +419,16 @@ fn train_model() -> Result<(), Box<dyn Error>> {
         );
 
         // Continue with multitask evaluation below
-        evaluate_multitask_model(
-            &mlp,
-            &train_features,
-            &train_labels,
-            &test_records,
-            &tfidf,
-            &bert_encoder,
+        let eval_ctx = EvaluationContext {
+            train_features: &train_features,
+            train_labels: &train_labels,
+            test_records,
+            tfidf: &tfidf,
+            bert_encoder: &bert_encoder,
             train_start,
-            &config,
-        )?;
+            config: &config,
+        };
+        evaluate_multitask_model(&mlp, &eval_ctx)?;
     } else {
         let mut mlp = GpuMLP::new(
             input_dim as i64,
@@ -445,35 +446,40 @@ fn train_model() -> Result<(), Box<dyn Error>> {
         );
 
         // Continue with single-task evaluation below
-        evaluate_singletask_model(
-            &mlp,
-            &train_features,
-            &train_labels,
-            &test_records,
-            &tfidf,
-            &bert_encoder,
+        let eval_ctx = EvaluationContext {
+            train_features: &train_features,
+            train_labels: &train_labels,
+            test_records,
+            tfidf: &tfidf,
+            bert_encoder: &bert_encoder,
             train_start,
-            &config,
-        )?;
+            config: &config,
+        };
+        evaluate_singletask_model(&mlp, &eval_ctx)?;
     }
 
     Ok(())
+}
+
+// Evaluation context to avoid too many arguments
+struct EvaluationContext<'a> {
+    train_features: &'a [Vec<f64>],
+    train_labels: &'a [String],
+    test_records: &'a [MbtiRecord],
+    tfidf: &'a TfidfVectorizer,
+    bert_encoder: &'a RustBertEncoder,
+    train_start: Instant,
+    config: &'a Config,
 }
 
 // Evaluation function for multi-task model
 fn evaluate_multitask_model(
     mlp: &MultiTaskGpuMLP,
-    train_features: &[Vec<f64>],
-    train_labels: &[String],
-    test_records: &[MbtiRecord],
-    tfidf: &TfidfVectorizer,
-    bert_encoder: &RustBertEncoder,
-    train_start: Instant,
-    config: &Config,
+    ctx: &EvaluationContext,
 ) -> Result<(), Box<dyn Error>> {
     println!(
         "\nTotal training time: {:.2}s\n",
-        train_start.elapsed().as_secs_f64()
+        ctx.train_start.elapsed().as_secs_f64()
     );
     println!("===================================================================\n");
 
@@ -481,29 +487,33 @@ fn evaluate_multitask_model(
 
     // Training Set Evaluation
     println!("Training Set:");
-    let train_predictions = mlp.predict_batch(train_features);
+    let train_predictions = mlp.predict_batch(ctx.train_features);
     let mut correct = 0;
-    for (pred, label) in train_predictions.iter().zip(train_labels.iter()) {
+    for (pred, label) in train_predictions.iter().zip(ctx.train_labels.iter()) {
         if pred == label {
             correct += 1;
         }
     }
-    let train_acc = correct as f64 / train_labels.len() as f64;
+    let train_acc = correct as f64 / ctx.train_labels.len() as f64;
     println!("  Accuracy: {:.2}%\n", train_acc * 100.0);
 
     // Test Set Evaluation
     println!("Test Set:");
     let test_start = Instant::now();
-    let test_texts: Vec<String> = test_records.iter().map(|r| r.posts.clone()).collect();
-    let test_labels: Vec<String> = test_records.iter().map(|r| r.mbti_type.clone()).collect();
+    let test_texts: Vec<String> = ctx.test_records.iter().map(|r| r.posts.clone()).collect();
+    let test_labels: Vec<String> = ctx
+        .test_records
+        .iter()
+        .map(|r| r.mbti_type.clone())
+        .collect();
 
     let mut test_features = Vec::new();
     for (i, text) in test_texts.iter().enumerate() {
         if (i + 1) % 500 == 0 {
             println!("  Test: {}/{}", i + 1, test_texts.len());
         }
-        let tfidf_feat = tfidf.transform(text);
-        let bert_feat = bert_encoder.extract_features(text)?;
+        let tfidf_feat = ctx.tfidf.transform(text);
+        let bert_feat = ctx.bert_encoder.extract_features(text)?;
         let mut combined = tfidf_feat;
         combined.extend(bert_feat);
         test_features.push(combined);
@@ -523,25 +533,16 @@ fn evaluate_multitask_model(
     print_results(test_acc);
 
     // Save model
-    save_model(mlp, tfidf, &config.output)?;
+    save_model(mlp, ctx.tfidf, &ctx.config.output)?;
 
     Ok(())
 }
 
 // Evaluation function for single-task model
-fn evaluate_singletask_model(
-    mlp: &GpuMLP,
-    train_features: &[Vec<f64>],
-    train_labels: &[String],
-    test_records: &[MbtiRecord],
-    tfidf: &TfidfVectorizer,
-    bert_encoder: &RustBertEncoder,
-    train_start: Instant,
-    config: &Config,
-) -> Result<(), Box<dyn Error>> {
+fn evaluate_singletask_model(mlp: &GpuMLP, ctx: &EvaluationContext) -> Result<(), Box<dyn Error>> {
     println!(
         "\nTotal training time: {:.2}s\n",
-        train_start.elapsed().as_secs_f64()
+        ctx.train_start.elapsed().as_secs_f64()
     );
     println!("===================================================================\n");
 
@@ -549,29 +550,33 @@ fn evaluate_singletask_model(
 
     // Training Set Evaluation
     println!("Training Set:");
-    let train_predictions = mlp.predict_batch(train_features);
+    let train_predictions = mlp.predict_batch(ctx.train_features);
     let mut correct = 0;
-    for (pred, label) in train_predictions.iter().zip(train_labels.iter()) {
+    for (pred, label) in train_predictions.iter().zip(ctx.train_labels.iter()) {
         if pred == label {
             correct += 1;
         }
     }
-    let train_acc = correct as f64 / train_labels.len() as f64;
+    let train_acc = correct as f64 / ctx.train_labels.len() as f64;
     println!("  Accuracy: {:.2}%\n", train_acc * 100.0);
 
     // Test Set Evaluation
     println!("Test Set:");
     let test_start = Instant::now();
-    let test_texts: Vec<String> = test_records.iter().map(|r| r.posts.clone()).collect();
-    let test_labels: Vec<String> = test_records.iter().map(|r| r.mbti_type.clone()).collect();
+    let test_texts: Vec<String> = ctx.test_records.iter().map(|r| r.posts.clone()).collect();
+    let test_labels: Vec<String> = ctx
+        .test_records
+        .iter()
+        .map(|r| r.mbti_type.clone())
+        .collect();
 
     let mut test_features = Vec::new();
     for (i, text) in test_texts.iter().enumerate() {
         if (i + 1) % 500 == 0 {
             println!("  Test: {}/{}", i + 1, test_texts.len());
         }
-        let tfidf_feat = tfidf.transform(text);
-        let bert_feat = bert_encoder.extract_features(text)?;
+        let tfidf_feat = ctx.tfidf.transform(text);
+        let bert_feat = ctx.bert_encoder.extract_features(text)?;
         let mut combined = tfidf_feat;
         combined.extend(bert_feat);
         test_features.push(combined);
@@ -591,7 +596,7 @@ fn evaluate_singletask_model(
     print_results(test_acc);
 
     // Save model
-    save_model_singletask(mlp, tfidf, &config.output)?;
+    save_model_singletask(mlp, ctx.tfidf, &ctx.config.output)?;
 
     Ok(())
 }
@@ -645,11 +650,11 @@ fn save_model(
     std::fs::create_dir_all(&output.model_dir)?;
 
     println!("Saving model...");
-    
+
     // Add suffix for multi-task models
     let tfidf_file = output.tfidf_file.replace(".json", "_multitask.json");
     let mlp_file = output.mlp_file.replace(".pt", "_multitask.pt");
-    
+
     let tfidf_path = format!("{}/{}", output.model_dir, tfidf_file);
     let mlp_path = format!("{}/{}", output.model_dir, mlp_file);
 
@@ -677,12 +682,12 @@ fn save_model_singletask(
     std::fs::create_dir_all(&output.model_dir)?;
 
     println!("Saving model...");
-    
+
     // Add suffix for single-task models
     let tfidf_file = output.tfidf_file.replace(".json", "_single.json");
     let mlp_file = output.mlp_file.replace(".pt", "_single.pt");
     let class_file = output.class_mapping_file.replace(".json", "_single.json");
-    
+
     let tfidf_path = format!("{}/{}", output.model_dir, tfidf_file);
     let mlp_path = format!("{}/{}", output.model_dir, mlp_file);
     let class_path = format!("{}/{}", output.model_dir, class_file);
