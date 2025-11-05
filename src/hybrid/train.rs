@@ -7,7 +7,10 @@ use super::tfidf::TfidfVectorizer;
 use crate::neural_net_gpu::GpuMLP;
 use crate::neural_net_gpu_multitask::MultiTaskGpuMLP;
 use crate::psyattention::bert_rustbert::RustBertEncoder;
+use crate::psyattention::full_features::{FullPsychologicalExtractor, PearsonFeatureSelector};
+use crate::psyattention::psychological_features::PsychologicalFeatureExtractor;
 use csv::ReaderBuilder;
+use ndarray::Array2;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::error::Error;
@@ -182,7 +185,7 @@ fn print_training_header(config: &Config) {
 }
 
 /// Extract hybrid TF-IDF + BERT features from training data.
-fn extract_features(train_records: &[MbtiRecord], _config: &Config) -> FeatureExtractionResult {
+fn extract_features(train_records: &[MbtiRecord], config: &Config) -> FeatureExtractionResult {
     // Extract TF-IDF features
     println!("Building TF-IDF vectorizer (top 5000 words)...");
     let train_texts: Vec<String> = train_records.iter().map(|r| r.posts.clone()).collect();
@@ -231,19 +234,122 @@ fn extract_features(train_records: &[MbtiRecord], _config: &Config) -> FeatureEx
         }
     }
 
-    // Combine TF-IDF + BERT features
+    // Extract psychological features if enabled
+    let psy_features = if config.features.use_psychological_features {
+        extract_psychological_features(&train_texts, &config.features.psy_feature_type)?
+    } else {
+        vec![vec![]; train_texts.len()] // Empty features
+    };
+
+    // Combine TF-IDF + BERT + Psychological features
     println!("  Combining features...");
     let mut train_features = Vec::new();
-    for (tfidf_feat, bert_feat) in tfidf_features
+    for ((tfidf_feat, bert_feat), psy_feat) in tfidf_features
         .into_iter()
         .zip(all_bert_features.into_iter())
+        .zip(psy_features.into_iter())
     {
         let mut combined = tfidf_feat;
         combined.extend(bert_feat);
+        combined.extend(psy_feat);
         train_features.push(combined);
     }
 
+    // Report final feature dimensions
+    if let Some(first) = train_features.first() {
+        println!("  Final feature dimension: {}", first.len());
+    }
+
     Ok((train_features, train_labels, tfidf, bert_encoder))
+}
+
+/// Extract psychological features based on configuration.
+fn extract_psychological_features(
+    texts: &[String],
+    feature_type: &str,
+) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
+    match feature_type {
+        "simple" => {
+            println!("  Extracting psychological features (simple: 9 features)...");
+            let extractor = PsychologicalFeatureExtractor::new();
+            let features: Vec<Vec<f64>> = texts
+                .iter()
+                .enumerate()
+                .map(|(i, text)| {
+                    if (i + 1) % 1000 == 0 {
+                        println!("    Psychological: {}/{}", i + 1, texts.len());
+                    }
+                    extractor.extract_features(text)
+                })
+                .collect();
+            Ok(features)
+        }
+        "selected" => {
+            println!("  Extracting psychological features (full: 930 → 108 selected)...");
+            let extractor = FullPsychologicalExtractor::new();
+
+            // Extract all 930 features
+            println!("    Extracting 930 features...");
+            let all_features: Vec<Vec<f64>> = texts
+                .iter()
+                .enumerate()
+                .map(|(i, text)| {
+                    if (i + 1) % 500 == 0 {
+                        println!("      Progress: {}/{}", i + 1, texts.len());
+                    }
+                    extractor.extract_all_features(text)
+                })
+                .collect();
+
+            // Convert to ndarray for feature selection
+            println!("    Performing feature selection (Pearson correlation)...");
+            let n_samples = all_features.len();
+            let n_features = 930;
+            let mut feature_matrix = Array2::<f64>::zeros((n_samples, n_features));
+            for (i, features) in all_features.iter().enumerate() {
+                for (j, &value) in features.iter().enumerate() {
+                    feature_matrix[[i, j]] = value;
+                }
+            }
+
+            // Select top 108 features
+            let mut selector = PearsonFeatureSelector::new(0.85);
+            let selected_indices = selector.fit(&feature_matrix, 108);
+
+            println!(
+                "    Selected {} features (target: 108)",
+                selected_indices.len()
+            );
+
+            // Apply feature selection
+            let selected_features: Vec<Vec<f64>> = all_features
+                .into_iter()
+                .map(|features| selected_indices.iter().map(|&idx| features[idx]).collect())
+                .collect();
+
+            Ok(selected_features)
+        }
+        "full" => {
+            println!("  Extracting psychological features (full: 930 features)...");
+            let extractor = FullPsychologicalExtractor::new();
+            let features: Vec<Vec<f64>> = texts
+                .iter()
+                .enumerate()
+                .map(|(i, text)| {
+                    if (i + 1) % 500 == 0 {
+                        println!("    Psychological: {}/{}", i + 1, texts.len());
+                    }
+                    extractor.extract_all_features(text)
+                })
+                .collect();
+            Ok(features)
+        }
+        _ => {
+            eprintln!("Unknown psychological feature type: {}", feature_type);
+            eprintln!("Using default (selected)");
+            extract_psychological_features(texts, "selected")
+        }
+    }
 }
 
 /// Train and evaluate a multi-task model.

@@ -36,6 +36,16 @@ pub struct DataConfig {
 pub struct FeaturesConfig {
     /// Maximum number of TF-IDF features to extract
     pub max_tfidf_features: usize,
+    /// Whether to use psychological features from SEANCE, TAACO, TAALES
+    #[serde(default)]
+    pub use_psychological_features: bool,
+    /// Psychological feature type: "simple" (9), "selected" (108), "full" (930)
+    #[serde(default = "default_psy_feature_type")]
+    pub psy_feature_type: String,
+}
+
+fn default_psy_feature_type() -> String {
+    "selected".to_string()
 }
 
 /// Model architecture configuration.
@@ -106,6 +116,8 @@ impl Default for Config {
             },
             features: FeaturesConfig {
                 max_tfidf_features: 5000,
+                use_psychological_features: false,
+                psy_feature_type: "selected".to_string(),
             },
             model: ModelConfig {
                 model_type: "multitask".to_string(),
