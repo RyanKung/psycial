@@ -66,13 +66,25 @@ pub struct ModelConfig {
 /// Training hyperparameters.
 #[derive(Debug, Deserialize)]
 pub struct TrainingConfig {
-    /// Number of training epochs
+    /// Number of training epochs (for single-task model)
     pub epochs: i64,
     /// Batch size for training
     pub batch_size: i64,
     /// Batch size for BERT feature extraction
     #[allow(dead_code)]
     pub bert_batch_size: usize,
+    /// Per-dimension epochs for multi-task model [E/I, S/N, T/F, J/P]
+    /// Different dimensions have different data distributions:
+    /// - E/I: 77% vs 23% (moderate imbalance)
+    /// - S/N: 86% vs 14% (severe imbalance) ← needs more epochs
+    /// - T/F: 46% vs 54% (most balanced) ← needs fewer epochs
+    /// - J/P: 40% vs 60% (moderate imbalance)
+    #[serde(default = "default_per_dimension_epochs")]
+    pub per_dimension_epochs: Vec<i64>,
+}
+
+fn default_per_dimension_epochs() -> Vec<i64> {
+    vec![25, 35, 20, 25] // [E/I, S/N, T/F, J/P]
 }
 
 /// Output paths configuration.
@@ -130,6 +142,7 @@ impl Default for Config {
                 epochs: 25,
                 batch_size: 64,
                 bert_batch_size: 64,
+                per_dimension_epochs: vec![25, 35, 20, 25],
             },
             output: OutputConfig {
                 model_dir: "models".to_string(),

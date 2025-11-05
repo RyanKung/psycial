@@ -81,7 +81,8 @@ impl MultiTaskGpuMLP {
         }
     }
 
-    /// Train the multi-task model
+    /// Train the multi-task model with uniform epochs for all dimensions
+    #[allow(dead_code)]
     pub fn train(
         &mut self,
         features: &[Vec<f64>],
@@ -89,8 +90,37 @@ impl MultiTaskGpuMLP {
         epochs: i64,
         batch_size: i64,
     ) {
+        // Use uniform epochs for all dimensions
+        self.train_per_dimension(features, labels, vec![epochs; 4], batch_size);
+    }
+
+    /// Train the multi-task model with per-dimension epochs
+    /// per_dimension_epochs: [E/I, S/N, T/F, J/P]
+    pub fn train_per_dimension(
+        &mut self,
+        features: &[Vec<f64>],
+        labels: &[String], // MBTI types like "INTJ", "ENFP"
+        per_dimension_epochs: Vec<i64>,
+        batch_size: i64,
+    ) {
         println!("🏋️  Training Multi-Task Model on {:?}...", self.device);
-        println!("   4 binary classifiers: E/I, S/N, T/F, J/P\n");
+        println!("   4 binary classifiers with per-dimension epochs:");
+        println!(
+            "   - E/I: {} epochs (I型 77% vs E型 23%)",
+            per_dimension_epochs[0]
+        );
+        println!(
+            "   - S/N: {} epochs (N型 86% vs S型 14%) ← Most imbalanced",
+            per_dimension_epochs[1]
+        );
+        println!(
+            "   - T/F: {} epochs (F型 54% vs T型 46%) ← Most balanced",
+            per_dimension_epochs[2]
+        );
+        println!(
+            "   - J/P: {} epochs (J型 60% vs P型 40%)\n",
+            per_dimension_epochs[3]
+        );
 
         let n_samples = features.len() as i64;
         let feature_dim = features[0].len() as i64;
@@ -122,8 +152,17 @@ impl MultiTaskGpuMLP {
         .build(&self.vs, self.learning_rate)
         .unwrap();
 
+        // Determine max epochs for the training loop
+        let max_epochs = *per_dimension_epochs.iter().max().unwrap_or(&25);
+
+        // Track which dimensions are still training
+        let epochs_ei = per_dimension_epochs[0];
+        let epochs_sn = per_dimension_epochs[1];
+        let epochs_tf = per_dimension_epochs[2];
+        let epochs_jp = per_dimension_epochs[3];
+
         // Training loop
-        for epoch in 0..epochs {
+        for epoch in 0..max_epochs {
             let mut total_loss = 0.0;
             let mut correct_ei = 0;
             let mut correct_sn = 0;
@@ -148,14 +187,36 @@ impl MultiTaskGpuMLP {
                 let logits_tf = self.head_tf.forward(&shared_features);
                 let logits_jp = self.head_jp.forward(&shared_features);
 
-                // Calculate loss for each dimension
-                let loss_ei = logits_ei.cross_entropy_for_logits(&batch_y_ei);
-                let loss_sn = logits_sn.cross_entropy_for_logits(&batch_y_sn);
-                let loss_tf = logits_tf.cross_entropy_for_logits(&batch_y_tf);
-                let loss_jp = logits_jp.cross_entropy_for_logits(&batch_y_jp);
+                // Calculate loss for each dimension (only for active dimensions)
+                let mut active_losses = Vec::new();
 
-                // Total loss (average of 4 dimensions)
-                let loss = (&loss_ei + &loss_sn + &loss_tf + &loss_jp) / 4.0;
+                if epoch < epochs_ei {
+                    let loss_ei = logits_ei.cross_entropy_for_logits(&batch_y_ei);
+                    active_losses.push(loss_ei);
+                }
+                if epoch < epochs_sn {
+                    let loss_sn = logits_sn.cross_entropy_for_logits(&batch_y_sn);
+                    active_losses.push(loss_sn);
+                }
+                if epoch < epochs_tf {
+                    let loss_tf = logits_tf.cross_entropy_for_logits(&batch_y_tf);
+                    active_losses.push(loss_tf);
+                }
+                if epoch < epochs_jp {
+                    let loss_jp = logits_jp.cross_entropy_for_logits(&batch_y_jp);
+                    active_losses.push(loss_jp);
+                }
+
+                // Skip if no active dimensions
+                if active_losses.is_empty() {
+                    continue;
+                }
+
+                // Total loss (average of active dimensions)
+                let loss = active_losses.iter().fold(
+                    Tensor::zeros([], (tch::Kind::Float, self.device)),
+                    |acc, l| acc + l,
+                ) / active_losses.len() as f64;
 
                 opt.zero_grad();
                 loss.backward();
@@ -195,16 +256,39 @@ impl MultiTaskGpuMLP {
                 let acc_jp = correct_jp as f64 / n_samples as f64 * 100.0;
                 let avg_acc = (acc_ei + acc_sn + acc_tf + acc_jp) / 4.0;
 
+                // Show which dimensions are still training
+                let mut active_dims = Vec::new();
+                if epoch < epochs_ei {
+                    active_dims.push("E/I");
+                }
+                if epoch < epochs_sn {
+                    active_dims.push("S/N");
+                }
+                if epoch < epochs_tf {
+                    active_dims.push("T/F");
+                }
+                if epoch < epochs_jp {
+                    active_dims.push("J/P");
+                }
+                let active_str = if active_dims.len() == 4 {
+                    "all".to_string()
+                } else if active_dims.is_empty() {
+                    "done".to_string()
+                } else {
+                    active_dims.join("+")
+                };
+
                 println!(
-                    "  Epoch {:3}/{}: Loss={:.4}, Avg={:.2}% (E/I={:.1}% S/N={:.1}% T/F={:.1}% J/P={:.1}%)",
+                    "  Epoch {:3}/{}: Loss={:.4}, Avg={:.2}% (E/I={:.1}% S/N={:.1}% T/F={:.1}% J/P={:.1}%) [{}]",
                     epoch + 1,
-                    epochs,
+                    max_epochs,
                     avg_loss,
                     avg_acc,
                     acc_ei,
                     acc_sn,
                     acc_tf,
-                    acc_jp
+                    acc_jp,
+                    active_str
                 );
             }
         }

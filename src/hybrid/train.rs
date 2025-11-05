@@ -362,10 +362,10 @@ fn train_multitask_model(params: TrainingParams) -> Result<(), Box<dyn Error>> {
         params.config.model.weight_decay,
     );
 
-    mlp.train(
+    mlp.train_per_dimension(
         &params.train_features,
         &params.train_labels,
-        params.config.training.epochs,
+        params.config.training.per_dimension_epochs.clone(),
         params.config.training.batch_size,
     );
 

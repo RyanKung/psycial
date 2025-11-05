@@ -40,13 +40,21 @@ dropout_rate = 0.6
 weight_decay = 0.01
 
 [training]
-# Number of training epochs
+# Number of training epochs (for single-task model)
 # Paper uses 50+50 (two-stage); we use 20 for single-stage
 epochs = 20
 # Batch size for training
 batch_size = 64
 # BERT batch processing size
 bert_batch_size = 64
+
+# Per-dimension epochs for multi-task model [E/I, S/N, T/F, J/P]
+# Adjusted based on data distribution imbalance:
+# - E/I: 25 epochs (77% vs 23%, moderate)
+# - S/N: 35 epochs (86% vs 14%, MOST imbalanced) ← needs more training
+# - T/F: 20 epochs (54% vs 46%, MOST balanced) ← needs less training
+# - J/P: 25 epochs (60% vs 40%, moderate)
+per_dimension_epochs = [25, 35, 20, 25]
 
 [output]
 # Directory to save trained models
