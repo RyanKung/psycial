@@ -94,7 +94,7 @@ impl MultiTaskGpuMLP {
         self.train_per_dimension(features, labels, vec![epochs; 4], batch_size);
     }
 
-    /// Train the multi-task model with per-dimension epochs
+    /// Train the multi-task model with per-dimension epochs (uniform weights)
     /// per_dimension_epochs: [E/I, S/N, T/F, J/P]
     pub fn train_per_dimension(
         &mut self,
@@ -103,23 +103,44 @@ impl MultiTaskGpuMLP {
         per_dimension_epochs: Vec<i64>,
         batch_size: i64,
     ) {
+        // Use uniform weights
+        self.train_per_dimension_weighted(
+            features,
+            labels,
+            per_dimension_epochs,
+            vec![1.0; 4],
+            batch_size,
+        );
+    }
+
+    /// Train the multi-task model with per-dimension epochs and weighted losses
+    /// per_dimension_epochs: [E/I, S/N, T/F, J/P]
+    /// dimension_weights: [E/I, S/N, T/F, J/P] - higher weight = more importance
+    pub fn train_per_dimension_weighted(
+        &mut self,
+        features: &[Vec<f64>],
+        labels: &[String], // MBTI types like "INTJ", "ENFP"
+        per_dimension_epochs: Vec<i64>,
+        dimension_weights: Vec<f64>,
+        batch_size: i64,
+    ) {
         println!("🏋️  Training Multi-Task Model on {:?}...", self.device);
-        println!("   4 binary classifiers with per-dimension epochs:");
+        println!("   4 binary classifiers with per-dimension epochs & weighted losses:");
         println!(
-            "   - E/I: {} epochs (I型 77% vs E型 23%)",
-            per_dimension_epochs[0]
+            "   - E/I: {} epochs, weight={:.1} (I型 77% vs E型 23%)",
+            per_dimension_epochs[0], dimension_weights[0]
         );
         println!(
-            "   - S/N: {} epochs (N型 86% vs S型 14%) ← Most imbalanced",
-            per_dimension_epochs[1]
+            "   - S/N: {} epochs, weight={:.1} (N型 86% vs S型 14%) ← Most imbalanced",
+            per_dimension_epochs[1], dimension_weights[1]
         );
         println!(
-            "   - T/F: {} epochs (F型 54% vs T型 46%) ← Most balanced",
-            per_dimension_epochs[2]
+            "   - T/F: {} epochs, weight={:.1} (F型 54% vs T型 46%) ← Weakest dimension",
+            per_dimension_epochs[2], dimension_weights[2]
         );
         println!(
-            "   - J/P: {} epochs (J型 60% vs P型 40%)\n",
-            per_dimension_epochs[3]
+            "   - J/P: {} epochs, weight={:.1} (J型 60% vs P型 40%)\n",
+            per_dimension_epochs[3], dimension_weights[3]
         );
 
         let n_samples = features.len() as i64;
@@ -187,36 +208,38 @@ impl MultiTaskGpuMLP {
                 let logits_tf = self.head_tf.forward(&shared_features);
                 let logits_jp = self.head_jp.forward(&shared_features);
 
-                // Calculate loss for each dimension (only for active dimensions)
-                let mut active_losses = Vec::new();
+                // Calculate weighted loss for each dimension (only for active dimensions)
+                let mut weighted_loss = Tensor::zeros([], (tch::Kind::Float, self.device));
+                let mut total_weight = 0.0;
 
                 if epoch < epochs_ei {
                     let loss_ei = logits_ei.cross_entropy_for_logits(&batch_y_ei);
-                    active_losses.push(loss_ei);
+                    weighted_loss = weighted_loss + &loss_ei * dimension_weights[0];
+                    total_weight += dimension_weights[0];
                 }
                 if epoch < epochs_sn {
                     let loss_sn = logits_sn.cross_entropy_for_logits(&batch_y_sn);
-                    active_losses.push(loss_sn);
+                    weighted_loss = weighted_loss + &loss_sn * dimension_weights[1];
+                    total_weight += dimension_weights[1];
                 }
                 if epoch < epochs_tf {
                     let loss_tf = logits_tf.cross_entropy_for_logits(&batch_y_tf);
-                    active_losses.push(loss_tf);
+                    weighted_loss = weighted_loss + &loss_tf * dimension_weights[2];
+                    total_weight += dimension_weights[2];
                 }
                 if epoch < epochs_jp {
                     let loss_jp = logits_jp.cross_entropy_for_logits(&batch_y_jp);
-                    active_losses.push(loss_jp);
+                    weighted_loss = weighted_loss + &loss_jp * dimension_weights[3];
+                    total_weight += dimension_weights[3];
                 }
 
                 // Skip if no active dimensions
-                if active_losses.is_empty() {
+                if total_weight == 0.0 {
                     continue;
                 }
 
-                // Total loss (average of active dimensions)
-                let loss = active_losses.iter().fold(
-                    Tensor::zeros([], (tch::Kind::Float, self.device)),
-                    |acc, l| acc + l,
-                ) / active_losses.len() as f64;
+                // Normalize by total weight
+                let loss = weighted_loss / total_weight;
 
                 opt.zero_grad();
                 loss.backward();

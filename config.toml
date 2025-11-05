@@ -56,6 +56,16 @@ bert_batch_size = 64
 # - J/P: 25 epochs (60% vs 40%, moderate)
 per_dimension_epochs = [25, 35, 20, 25]
 
+# Loss weights for each dimension [E/I, S/N, T/F, J/P]
+# Higher weight = model focuses more on that dimension during training
+# Strategy: boost weaker dimensions to improve overall accuracy
+# - E/I: 1.0 (standard, already performs well at 76.9%)
+# - S/N: 1.0 (standard, already performs best at 86.0%)
+# - T/F: 1.5 (boosted, weakest dimension at 53.8% needs more focus) ← KEY
+# - J/P: 1.2 (slightly boosted, moderate at 60.4%)
+# Overall accuracy = E/I × S/N × T/F × J/P, so improving T/F has biggest impact
+dimension_loss_weights = [1.0, 1.0, 1.5, 1.2]
+
 [output]
 # Directory to save trained models
 model_dir = "models"
