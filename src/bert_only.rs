@@ -176,10 +176,10 @@ pub fn main_bert_only(_args: Vec<String>) -> Result<(), Box<dyn Error>> {
 
     if test_acc > 0.1960 {
         println!("✅ BERT-only performs better!");
-        println!("   → BERT特征质量高于心理特征");
+        println!("   -> BERT features are higher quality than psychological features");
     } else {
-        println!("📊 组合特征更好");
-        println!("   → 需要改进融合策略");
+        println!("📊 Combined features are better");
+        println!("   -> Need to improve fusion strategy");
     }
 
     println!();

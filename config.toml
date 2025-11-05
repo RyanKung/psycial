@@ -33,16 +33,17 @@ hidden_layers = [768, 512, 256]
 learning_rate = 0.001
 # Dropout rate for regularization (0.0-1.0)
 # Higher values = stronger regularization, less overfitting
-# Paper: implicit in Transformer; we use 0.6 as balanced value
-dropout_rate = 0.6
+# 0.3 is balanced - 0.6 was too aggressive and prevented learning
+dropout_rate = 0.3
 # Weight decay (L2 regularization) for Adam optimizer (0.0-0.1)
 # Typical values: 0.0001-0.01. Higher values = stronger regularization
-weight_decay = 0.01
+# Reduced from 0.01 to avoid over-regularization
+weight_decay = 0.001
 
 [training]
 # Number of training epochs (for single-task model)
-# Paper uses 50+50 (two-stage); we use 20 for single-stage
-epochs = 20
+# Paper uses 50+50 (two-stage); we use 30 for single-stage
+epochs = 30
 # Batch size for training
 batch_size = 64
 # BERT batch processing size
@@ -50,11 +51,12 @@ bert_batch_size = 64
 
 # Per-dimension epochs for multi-task model [E/I, S/N, T/F, J/P]
 # Adjusted based on data distribution imbalance:
-# - E/I: 25 epochs (77% vs 23%, moderate)
-# - S/N: 35 epochs (86% vs 14%, MOST imbalanced) ← needs more training
-# - T/F: 20 epochs (54% vs 46%, MOST balanced) ← needs less training
-# - J/P: 25 epochs (60% vs 40%, moderate)
-per_dimension_epochs = [25, 35, 20, 25]
+# - E/I: 40 epochs (77% vs 23%, moderate imbalance, needs learning)
+# - S/N: 50 epochs (86% vs 14%, MOST imbalanced) ← needs most training
+# - T/F: 40 epochs (54% vs 46%, most balanced but weakest dimension)
+# - J/P: 40 epochs (60% vs 40%, moderate)
+# Increased from previous low values to allow actual learning
+per_dimension_epochs = [40, 50, 40, 40]
 
 # Loss weights for each dimension [E/I, S/N, T/F, J/P]
 # Higher weight = model focuses more on that dimension during training

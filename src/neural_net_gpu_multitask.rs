@@ -127,19 +127,19 @@ impl MultiTaskGpuMLP {
         println!("🏋️  Training Multi-Task Model on {:?}...", self.device);
         println!("   4 binary classifiers with per-dimension epochs & weighted losses:");
         println!(
-            "   - E/I: {} epochs, weight={:.1} (I型 77% vs E型 23%)",
+            "   - E/I: {} epochs, weight={:.1} (I: 77% vs E: 23%)",
             per_dimension_epochs[0], dimension_weights[0]
         );
         println!(
-            "   - S/N: {} epochs, weight={:.1} (N型 86% vs S型 14%) ← Most imbalanced",
+            "   - S/N: {} epochs, weight={:.1} (N: 86% vs S: 14%) <- Most imbalanced",
             per_dimension_epochs[1], dimension_weights[1]
         );
         println!(
-            "   - T/F: {} epochs, weight={:.1} (F型 54% vs T型 46%) ← Weakest dimension",
+            "   - T/F: {} epochs, weight={:.1} (F: 54% vs T: 46%) <- Weakest dimension",
             per_dimension_epochs[2], dimension_weights[2]
         );
         println!(
-            "   - J/P: {} epochs, weight={:.1} (J型 60% vs P型 40%)\n",
+            "   - J/P: {} epochs, weight={:.1} (J: 60% vs P: 40%)\n",
             per_dimension_epochs[3], dimension_weights[3]
         );
 
