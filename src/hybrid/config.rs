@@ -92,7 +92,6 @@ impl Config {
         let config: Config = toml::from_str(&content)?;
         Ok(config)
     }
-
 }
 
 impl Default for Config {
