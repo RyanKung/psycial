@@ -14,6 +14,7 @@ max_tfidf_features = 5000
 [model]
 # Model type: "single" (16-way classification) or "multitask" (4 x 2-way classification)
 # Multitask is more aligned with MBTI theory and often achieves better results
+# Can be overridden via command-line: --multi-task or --single-task
 model_type = "multitask"
 
 # Network architecture (hidden layer sizes)

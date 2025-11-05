@@ -41,13 +41,33 @@ batch_size = 64
 
 ## 训练模型
 
-```bash
-# 使用 multi-task 模型训练（默认）
-cargo run --release --bin psycial hybrid train
+### 方法 1：命令行参数（推荐）
 
-# 或者使用已编译的二进制
+```bash
+# 训练 multi-task 模型
+./target/release/psycial hybrid train --multi-task
+
+# 训练 single-task 模型
+./target/release/psycial hybrid train --single-task
+
+# 使用 config.toml 中的默认设置
 ./target/release/psycial hybrid train
 ```
+
+### 方法 2：配置文件
+
+编辑 `config.toml`：
+```toml
+[model]
+model_type = "multitask"  # 或 "single"
+```
+
+然后运行：
+```bash
+./target/release/psycial hybrid train
+```
+
+> 💡 **优先级**：命令行参数 > 配置文件
 
 ##输出示例
 
