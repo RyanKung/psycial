@@ -13,9 +13,86 @@ use csv::ReaderBuilder;
 use ndarray::Array2;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
 use std::time::Instant;
+
+/// Normalization parameters for psychological features
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FeatureNormalizer {
+    pub means: Vec<f64>,
+    pub stds: Vec<f64>,
+}
+
+impl FeatureNormalizer {
+    pub fn fit(features: &[Vec<f64>]) -> Self {
+        if features.is_empty() || features[0].is_empty() {
+            return FeatureNormalizer {
+                means: vec![],
+                stds: vec![],
+            };
+        }
+
+        let n_features = features[0].len();
+        let n_samples = features.len();
+        let mut means = vec![0.0; n_features];
+        let mut stds = vec![0.0; n_features];
+
+        // Compute means
+        for sample in features {
+            for (i, &val) in sample.iter().enumerate() {
+                means[i] += val;
+            }
+        }
+        for mean in &mut means {
+            *mean /= n_samples as f64;
+        }
+
+        // Compute standard deviations
+        for sample in features {
+            for (i, &val) in sample.iter().enumerate() {
+                stds[i] += (val - means[i]).powi(2);
+            }
+        }
+        for std in &mut stds {
+            *std = (*std / n_samples as f64).sqrt();
+            if *std < 1e-10 {
+                *std = 1.0; // Avoid division by zero
+            }
+        }
+
+        FeatureNormalizer { means, stds }
+    }
+
+    pub fn transform(&self, features: &[f64]) -> Vec<f64> {
+        features
+            .iter()
+            .enumerate()
+            .map(|(i, &val)| {
+                if i < self.means.len() {
+                    (val - self.means[i]) / self.stds[i]
+                } else {
+                    val
+                }
+            })
+            .collect()
+    }
+
+    pub fn save(&self, path: &str) -> std::io::Result<()> {
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        std::fs::write(path, json)?;
+        println!("  ✓ Feature normalizer saved to {}", path);
+        Ok(())
+    }
+
+    pub fn load(path: &str) -> std::io::Result<Self> {
+        let json = std::fs::read_to_string(path)?;
+        serde_json::from_str(&json)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+}
 
 /// Type alias for feature extraction result to reduce complexity.
 type FeatureExtractionResult = Result<
@@ -25,6 +102,7 @@ type FeatureExtractionResult = Result<
         TfidfVectorizer,
         RustBertEncoder,
         Option<PearsonFeatureSelector>,
+        Option<FeatureNormalizer>,
     ),
     Box<dyn Error>,
 >;
@@ -39,6 +117,7 @@ struct TrainingParams<'a> {
     tfidf: &'a TfidfVectorizer,
     bert_encoder: &'a RustBertEncoder,
     psy_selector: &'a Option<PearsonFeatureSelector>,
+    psy_normalizer: &'a Option<FeatureNormalizer>,
     train_start: Instant,
 }
 
@@ -100,8 +179,13 @@ pub fn train_model(model_type_override: Option<&str>) -> Result<(), Box<dyn Erro
     println!("===================================================================\n");
 
     // Extract features
-    let (train_features, train_labels, tfidf, bert_encoder, psy_selector) =
+    let (train_features, train_labels, tfidf, bert_encoder, psy_selector, psy_normalizer) =
         extract_features(train_records, &config)?;
+    
+    // Save normalizer if psychological features are used
+    if let Some(ref normalizer) = psy_normalizer {
+        normalizer.save("models/feature_normalizer.json").ok();
+    }
 
     // Train model
     let output_desc = if config.model.model_type == "multitask" {
@@ -162,6 +246,7 @@ pub fn train_model(model_type_override: Option<&str>) -> Result<(), Box<dyn Erro
         tfidf: &tfidf,
         bert_encoder: &bert_encoder,
         psy_selector: &psy_selector,
+        psy_normalizer: &psy_normalizer,
         train_start,
     };
 
@@ -288,13 +373,26 @@ fn extract_features(train_records: &[MbtiRecord], config: &Config) -> FeatureExt
         (vec![vec![]; train_texts.len()], None) // Empty features
     };
 
+    // Normalize psychological features if enabled
+    let (normalized_psy_features, psy_normalizer) = if config.features.use_psychological_features && !psy_features.is_empty() && !psy_features[0].is_empty() {
+        println!("  Normalizing psychological features...");
+        let normalizer = FeatureNormalizer::fit(&psy_features);
+        let normalized: Vec<Vec<f64>> = psy_features
+            .iter()
+            .map(|f| normalizer.transform(f))
+            .collect();
+        (normalized, Some(normalizer))
+    } else {
+        (psy_features, None)
+    };
+
     // Combine TF-IDF + BERT + Psychological features
     println!("  Combining features...");
     let mut train_features = Vec::new();
     for ((tfidf_feat, bert_feat), psy_feat) in tfidf_features
         .into_iter()
         .zip(all_bert_features.into_iter())
-        .zip(psy_features.into_iter())
+        .zip(normalized_psy_features.into_iter())
     {
         let mut combined = tfidf_feat;
         combined.extend(bert_feat);
@@ -302,16 +400,49 @@ fn extract_features(train_records: &[MbtiRecord], config: &Config) -> FeatureExt
         train_features.push(combined);
     }
 
-    // Report final feature dimensions
+    // Report final feature dimensions and statistics
     if let Some(first) = train_features.first() {
         println!("  Final feature dimension: {}", first.len());
+        
+        // Diagnose feature value ranges
+        if config.features.use_psychological_features {
+            println!("\n  Feature Statistics (first sample):");
+            let tfidf_end = config.features.max_tfidf_features;
+            let bert_end = tfidf_end + 384;
+            let psy_end = first.len();
+            
+            if first.len() >= psy_end {
+                let tfidf_vals = &first[..tfidf_end];
+                let bert_vals = &first[tfidf_end..bert_end];
+                let psy_vals = &first[bert_end..psy_end];
+                
+                let tfidf_max = tfidf_vals.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+                let bert_max = bert_vals.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+                let psy_max = psy_vals.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+                
+                let tfidf_min = tfidf_vals.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+                let bert_min = bert_vals.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+                let psy_min = psy_vals.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+                
+                println!("    TF-IDF range: [{:.4}, {:.4}]", tfidf_min, tfidf_max);
+                println!("    BERT range:   [{:.4}, {:.4}]", bert_min, bert_max);
+                println!("    Psy range:    [{:.4}, {:.4}]", psy_min, psy_max);
+                
+                // Check for NaN/Inf
+                let has_nan = psy_vals.iter().any(|&x| x.is_nan() || x.is_infinite());
+                if has_nan {
+                    println!("    ⚠️  WARNING: Psychological features contain NaN/Inf!");
+                }
+            }
+        }
     }
 
-    Ok((train_features, train_labels, tfidf, bert_encoder, psy_selector))
+    Ok((train_features, train_labels, tfidf, bert_encoder, psy_selector, psy_normalizer))
 }
 
 /// Extract psychological features based on configuration.
-/// Returns (features, optional_selector)
+/// Returns (features, optional_selector)  
+/// Note: Features are NOT normalized here - normalization happens in extract_features()
 fn extract_psychological_features(
     texts: &[String],
     feature_type: &str,
@@ -428,6 +559,7 @@ fn train_multitask_model(params: TrainingParams) -> Result<(), Box<dyn Error>> {
         tfidf: params.tfidf,
         bert_encoder: params.bert_encoder,
         psy_selector: params.psy_selector,
+        psy_normalizer: params.psy_normalizer,
         train_start: params.train_start,
         config: params.config,
     };
@@ -459,6 +591,7 @@ fn train_singletask_model(params: TrainingParams) -> Result<(), Box<dyn Error>> 
         tfidf: params.tfidf,
         bert_encoder: params.bert_encoder,
         psy_selector: params.psy_selector,
+        psy_normalizer: params.psy_normalizer,
         train_start: params.train_start,
         config: params.config,
     };

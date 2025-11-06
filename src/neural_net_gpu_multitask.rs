@@ -362,11 +362,68 @@ impl MultiTaskGpuMLP {
         })
     }
 
+    /// Predict with confidence scores for each dimension
+    /// Returns (prediction, [conf_ei, conf_sn, conf_tf, conf_jp])
+    pub fn predict_with_confidence(&self, features: &[f64]) -> (String, [f64; 4]) {
+        let features_f32: Vec<f32> = features.iter().map(|&x| x as f32).collect();
+        let input_tensor = Tensor::from_slice(&features_f32)
+            .to_device(self.device)
+            .unsqueeze(0);
+
+        tch::no_grad(|| {
+            // Forward through shared layers WITHOUT dropout
+            let mut shared_features = input_tensor.shallow_clone();
+            for layer in &self.shared_layers {
+                shared_features = layer.forward(&shared_features);
+                shared_features = shared_features.relu();
+            }
+
+            // Get logits from each head
+            let logits_ei = self.head_ei.forward(&shared_features);
+            let logits_sn = self.head_sn.forward(&shared_features);
+            let logits_tf = self.head_tf.forward(&shared_features);
+            let logits_jp = self.head_jp.forward(&shared_features);
+
+            // Apply softmax to get probabilities
+            let probs_ei = logits_ei.softmax(-1, tch::Kind::Float);
+            let probs_sn = logits_sn.softmax(-1, tch::Kind::Float);
+            let probs_tf = logits_tf.softmax(-1, tch::Kind::Float);
+            let probs_jp = logits_jp.softmax(-1, tch::Kind::Float);
+
+            // Get predictions and confidences (max probability)
+            let pred_ei = logits_ei.argmax(-1, false).int64_value(&[0]);
+            let pred_sn = logits_sn.argmax(-1, false).int64_value(&[0]);
+            let pred_tf = logits_tf.argmax(-1, false).int64_value(&[0]);
+            let pred_jp = logits_jp.argmax(-1, false).int64_value(&[0]);
+
+            let conf_ei = probs_ei.max().double_value(&[]);
+            let conf_sn = probs_sn.max().double_value(&[]);
+            let conf_tf = probs_tf.max().double_value(&[]);
+            let conf_jp = probs_jp.max().double_value(&[]);
+
+            // Combine predictions into MBTI type
+            let ei = if pred_ei == 0 { 'E' } else { 'I' };
+            let sn = if pred_sn == 0 { 'S' } else { 'N' };
+            let tf = if pred_tf == 0 { 'T' } else { 'F' };
+            let jp = if pred_jp == 0 { 'J' } else { 'P' };
+
+            (format!("{}{}{}{}", ei, sn, tf, jp), [conf_ei, conf_sn, conf_tf, conf_jp])
+        })
+    }
+
     /// Batch prediction
     pub fn predict_batch(&self, features_batch: &[Vec<f64>]) -> Vec<String> {
         features_batch
             .iter()
             .map(|features| self.predict(features))
+            .collect()
+    }
+
+    /// Batch prediction with confidence scores
+    pub fn predict_batch_with_confidence(&self, features_batch: &[Vec<f64>]) -> Vec<(String, [f64; 4])> {
+        features_batch
+            .iter()
+            .map(|features| self.predict_with_confidence(features))
             .collect()
     }
 

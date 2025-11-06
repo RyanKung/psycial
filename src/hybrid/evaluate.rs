@@ -9,6 +9,7 @@ use crate::neural_net_gpu_multitask::MultiTaskGpuMLP;
 use crate::psyattention::bert_rustbert::RustBertEncoder;
 use crate::psyattention::full_features::{FullPsychologicalExtractor, PearsonFeatureSelector};
 use crate::psyattention::psychological_features::PsychologicalFeatureExtractor;
+use super::train::FeatureNormalizer;
 use std::error::Error;
 use std::time::Instant;
 
@@ -20,6 +21,7 @@ pub struct EvaluationContext<'a> {
     pub tfidf: &'a TfidfVectorizer,
     pub bert_encoder: &'a RustBertEncoder,
     pub psy_selector: &'a Option<PearsonFeatureSelector>,
+    pub psy_normalizer: &'a Option<FeatureNormalizer>,
     pub train_start: Instant,
     pub config: &'a Config,
 }
@@ -76,12 +78,23 @@ pub fn evaluate_multitask_model(
                     .map(|text| extractor.extract_all_features(text))
                     .collect();
                 
-                // Apply saved selector
+                // Apply saved selector and normalize
                 if let Some(selector) = ctx.psy_selector {
-                    all_features
+                    let selected: Vec<Vec<f64>> = all_features
                         .into_iter()
                         .map(|features| selector.transform(&features))
-                        .collect()
+                        .collect();
+                    
+                    // Normalize using saved normalizer
+                    if let Some(normalizer) = ctx.psy_normalizer {
+                        selected
+                            .into_iter()
+                            .map(|f| normalizer.transform(&f))
+                            .collect()
+                    } else {
+                        eprintln!("Warning: Normalizer not found! Features may be unnormalized.");
+                        selected
+                    }
                 } else {
                     eprintln!("Warning: Psychological features enabled but selector not found!");
                     vec![vec![]; test_texts.len()]

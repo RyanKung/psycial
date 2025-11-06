@@ -39,6 +39,12 @@ pub mod hybrid;
 pub mod psyattention_candle;
 #[cfg(feature = "bert")]
 pub mod psyattention_full;
+#[cfg(feature = "bert")]
+pub mod test_psy_features;
+#[cfg(feature = "bert")]
+pub mod test_orthogonality;
+#[cfg(feature = "bert")]
+pub mod test_confidence_ensemble;
 
 // Re-export commonly used types
 use csv::ReaderBuilder;

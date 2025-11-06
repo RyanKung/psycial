@@ -14,6 +14,9 @@ mod neural_net_gpu_multitask;
 mod psyattention;
 mod psyattention_candle;
 mod psyattention_full;
+mod test_psy_features;
+mod test_orthogonality;
+mod test_confidence_ensemble;
 
 fn print_help() {
     println!(
@@ -33,6 +36,13 @@ SUBCOMMANDS:
     bert-only             BERT-only classification
     bert-mlp              BERT + MLP hybrid model
     hybrid                TF-IDF + BERT hybrid (interactive)
+    test-psy-simple       Test psychological features (9 features) alone
+    test-psy-selected     Test psychological features (108 features) alone
+    test-psy-norm         Test different normalization methods
+    test-orthogonal       Test prediction orthogonality between models
+    test-ensemble         Test ensemble strategies
+    test-conf-ensemble    Test confidence-based ensemble (specify threshold)
+    scan-thresholds       Scan confidence thresholds to find optimal
     help, --help, -h      Show this help message
 
 EXAMPLES:
@@ -85,6 +95,18 @@ fn main() {
         "bert-only" => bert_only::main_bert_only(sub_args),
         "bert-mlp" => bert_mlp::main_bert_mlp(sub_args),
         "hybrid" => hybrid::main_hybrid(sub_args),
+        "test-psy-simple" => test_psy_features::test_psychological_features_only("simple"),
+        "test-psy-selected" => test_psy_features::test_psychological_features_only("selected"),
+        "test-psy-norm" => test_psy_features::test_normalization_methods(),
+        "test-orthogonal" => test_orthogonality::test_prediction_orthogonality(),
+        "test-ensemble" => test_orthogonality::test_ensemble_strategies(),
+        "test-conf-ensemble" => {
+            let threshold = sub_args.get(0)
+                .and_then(|s| s.parse::<f64>().ok())
+                .unwrap_or(0.7);
+            test_confidence_ensemble::test_confidence_ensemble(threshold)
+        },
+        "scan-thresholds" => test_confidence_ensemble::scan_confidence_thresholds(),
         "help" | "--help" | "-h" => {
             print_help();
             process::exit(0);
