@@ -105,11 +105,33 @@ pub fn train_model(model_type_override: Option<&str>) -> Result<(), Box<dyn Erro
         "\nTraining GPU-Accelerated MLP ({})...",
         config.model.model_type
     );
-    let input_dim = config.features.max_tfidf_features + 384;
-    println!(
-        "  Input: {} features ({} TF-IDF + 384 BERT)",
-        input_dim, config.features.max_tfidf_features
-    );
+    
+    // Calculate input dimension based on enabled features
+    let psy_dim = if config.features.use_psychological_features {
+        match config.features.psy_feature_type.as_str() {
+            "simple" => 9,
+            "selected" => 108,
+            "full" => 930,
+            _ => 108, // default to selected
+        }
+    } else {
+        0
+    };
+    
+    let input_dim = config.features.max_tfidf_features + 384 + psy_dim;
+    
+    let feature_desc = if psy_dim > 0 {
+        format!(
+            "  Input: {} features ({} TF-IDF + 384 BERT + {} Psy)",
+            input_dim, config.features.max_tfidf_features, psy_dim
+        )
+    } else {
+        format!(
+            "  Input: {} features ({} TF-IDF + 384 BERT)",
+            input_dim, config.features.max_tfidf_features
+        )
+    };
+    println!("{}", feature_desc);
     println!(
         "  Architecture: {} -> {:?} -> {}",
         input_dim, config.model.hidden_layers, output_desc
@@ -171,9 +193,23 @@ fn print_training_header(config: &Config) {
     } else {
         "16"
     };
+    
+    // Calculate input dimension including psychological features
+    let psy_dim = if config.features.use_psychological_features {
+        match config.features.psy_feature_type.as_str() {
+            "simple" => 9,
+            "selected" => 108,
+            "full" => 930,
+            _ => 108,
+        }
+    } else {
+        0
+    };
+    let input_dim = config.features.max_tfidf_features + 384 + psy_dim;
+    
     println!(
         "  Architecture: {} -> {:?} -> {}",
-        config.features.max_tfidf_features + 384,
+        input_dim,
         config.model.hidden_layers,
         output_desc
     );

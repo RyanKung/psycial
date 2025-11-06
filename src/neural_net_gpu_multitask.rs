@@ -10,8 +10,8 @@ pub struct MultiTaskGpuMLP {
     device: Device,
     vs: nn::VarStore,
 
-    // Shared feature extraction layers
-    shared_net: nn::Sequential,
+    // Shared feature extraction layers (list of linear layers)
+    shared_layers: Vec<nn::Linear>,
 
     // Four independent output heads for each dimension
     head_ei: nn::Linear, // Extraversion/Introversion
@@ -21,6 +21,7 @@ pub struct MultiTaskGpuMLP {
 
     learning_rate: f64,
     weight_decay: f64,
+    dropout_rate: f64,
 }
 
 #[cfg(feature = "bert")]
@@ -45,20 +46,18 @@ impl MultiTaskGpuMLP {
         vs.set_kind(tch::Kind::Float); // Use f32 to match input data type
         let root = vs.root();
 
-        // Build shared network layers
-        let mut shared_net = nn::seq();
+        // Build shared network layers (list of linear layers)
+        let mut shared_linear_layers = Vec::new();
         let mut current_dim = input_dim;
 
         for (i, &hidden_dim) in shared_layers.iter().enumerate() {
-            shared_net = shared_net
-                .add(nn::linear(
-                    &root / format!("shared_fc{}", i),
-                    current_dim,
-                    hidden_dim,
-                    Default::default(),
-                ))
-                .add_fn(|x| x.relu())
-                .add_fn(move |x| x.dropout(dropout_rate, true));
+            let linear = nn::linear(
+                &root / format!("shared_fc{}", i),
+                current_dim,
+                hidden_dim,
+                Default::default(),
+            );
+            shared_linear_layers.push(linear);
             current_dim = hidden_dim;
         }
 
@@ -71,13 +70,14 @@ impl MultiTaskGpuMLP {
         MultiTaskGpuMLP {
             device,
             vs,
-            shared_net,
+            shared_layers: shared_linear_layers,
             head_ei,
             head_sn,
             head_tf,
             head_jp,
             learning_rate,
             weight_decay,
+            dropout_rate,
         }
     }
 
@@ -199,8 +199,13 @@ impl MultiTaskGpuMLP {
                 let batch_y_tf = y_tf.narrow(0, batch_start, batch_end - batch_start);
                 let batch_y_jp = y_jp.narrow(0, batch_start, batch_end - batch_start);
 
-                // Forward pass through shared layers
-                let shared_features = self.shared_net.forward(&batch_x);
+                // Forward pass through shared layers with dropout after each layer
+                let mut shared_features = batch_x.shallow_clone();
+                for layer in &self.shared_layers {
+                    shared_features = layer.forward(&shared_features);
+                    shared_features = shared_features.relu();
+                    shared_features = shared_features.dropout(self.dropout_rate, true);
+                }
 
                 // Four independent predictions
                 let logits_ei = self.head_ei.forward(&shared_features);
@@ -326,27 +331,35 @@ impl MultiTaskGpuMLP {
             .to_device(self.device)
             .unsqueeze(0);
 
-        // Forward through shared layers (in eval mode)
-        let shared_features = tch::no_grad(|| self.shared_net.forward(&input_tensor));
+        // CRITICAL: Disable dropout during prediction by using no_grad
+        tch::no_grad(|| {
+            // Forward through shared layers WITHOUT dropout
+            let mut shared_features = input_tensor.shallow_clone();
+            for layer in &self.shared_layers {
+                shared_features = layer.forward(&shared_features);
+                shared_features = shared_features.relu();
+                // No dropout during prediction!
+            }
 
-        // Get predictions from each head
-        let logits_ei = self.head_ei.forward(&shared_features);
-        let logits_sn = self.head_sn.forward(&shared_features);
-        let logits_tf = self.head_tf.forward(&shared_features);
-        let logits_jp = self.head_jp.forward(&shared_features);
+            // Get predictions from each head
+            let logits_ei = self.head_ei.forward(&shared_features);
+            let logits_sn = self.head_sn.forward(&shared_features);
+            let logits_tf = self.head_tf.forward(&shared_features);
+            let logits_jp = self.head_jp.forward(&shared_features);
 
-        let pred_ei = logits_ei.argmax(-1, false).int64_value(&[0]);
-        let pred_sn = logits_sn.argmax(-1, false).int64_value(&[0]);
-        let pred_tf = logits_tf.argmax(-1, false).int64_value(&[0]);
-        let pred_jp = logits_jp.argmax(-1, false).int64_value(&[0]);
+            let pred_ei = logits_ei.argmax(-1, false).int64_value(&[0]);
+            let pred_sn = logits_sn.argmax(-1, false).int64_value(&[0]);
+            let pred_tf = logits_tf.argmax(-1, false).int64_value(&[0]);
+            let pred_jp = logits_jp.argmax(-1, false).int64_value(&[0]);
 
-        // Combine predictions into MBTI type
-        let ei = if pred_ei == 0 { 'E' } else { 'I' };
-        let sn = if pred_sn == 0 { 'S' } else { 'N' };
-        let tf = if pred_tf == 0 { 'T' } else { 'F' };
-        let jp = if pred_jp == 0 { 'J' } else { 'P' };
+            // Combine predictions into MBTI type
+            let ei = if pred_ei == 0 { 'E' } else { 'I' };
+            let sn = if pred_sn == 0 { 'S' } else { 'N' };
+            let tf = if pred_tf == 0 { 'T' } else { 'F' };
+            let jp = if pred_jp == 0 { 'J' } else { 'P' };
 
-        format!("{}{}{}{}", ei, sn, tf, jp)
+            format!("{}{}{}{}", ei, sn, tf, jp)
+        })
     }
 
     /// Batch prediction
@@ -406,20 +419,18 @@ impl MultiTaskGpuMLP {
         vs.set_kind(tch::Kind::Float); // Use f32 to match input data type
         let root = vs.root();
 
-        // Rebuild network structure
-        let mut shared_net = nn::seq();
+        // Rebuild network structure (list of linear layers)
+        let mut shared_linear_layers = Vec::new();
         let mut current_dim = input_dim;
 
         for (i, &hidden_dim) in shared_layers.iter().enumerate() {
-            shared_net = shared_net
-                .add(nn::linear(
-                    &root / format!("shared_fc{}", i),
-                    current_dim,
-                    hidden_dim,
-                    Default::default(),
-                ))
-                .add_fn(|x| x.relu())
-                .add_fn(move |x| x.dropout(dropout_rate, false));
+            let linear = nn::linear(
+                &root / format!("shared_fc{}", i),
+                current_dim,
+                hidden_dim,
+                Default::default(),
+            );
+            shared_linear_layers.push(linear);
             current_dim = hidden_dim;
         }
 
@@ -434,13 +445,14 @@ impl MultiTaskGpuMLP {
         Ok(MultiTaskGpuMLP {
             device,
             vs,
-            shared_net,
+            shared_layers: shared_linear_layers,
             head_ei,
             head_sn,
             head_tf,
             head_jp,
             learning_rate: 0.001,
             weight_decay: 0.0, // Default for loaded models
+            dropout_rate,
         })
     }
 }

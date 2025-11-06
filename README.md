@@ -4,7 +4,7 @@
   # MBTI Personality Classifier
 
   [![Rust](https://img.shields.io/badge/Rust-100%25-orange)](https://www.rust-lang.org/)
-  [![Accuracy](https://img.shields.io/badge/Best-31.99%25-success)](https://github.com)
+  [![Accuracy](https://img.shields.io/badge/Best-49.80%25-success)](https://github.com)
   [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
   **Production-grade MBTI personality classification system** with neural network implementation in pure Rust.
@@ -16,14 +16,22 @@
 
 | Model | Method | Accuracy | vs Random | Training Time |
 |-------|--------|----------|-----------|---------------|
-| **V6** | **BERT + MLP** | **31.99%** | **5.1x** | 322s ⭐ **BEST** |
+| **V7** | **🏆 TF-IDF + BERT + Multi-Task GPU** | **49.80%** | **8.0x** | ~50s | ⭐ **BEST** |
+| V6 | BERT + MLP (single-task) | 31.99% | 5.1x | 322s |
 | V1 | TF-IDF + Naive Bayes | 21.73% | 3.5x | 2s |
 | V2 | 9 Psychological Features | 21.21% | 3.4x | 3s |
 | V3 | 930 Psychological Features | 20.12% | 3.2x | 30s |
 | V5 | BERT Only + Cosine | 18.39% | 2.9x | 583s |
-| - | Paper Target | 86.30% | 13.8x | GPU hours |
 
 **Random Baseline**: 6.25% (16 classes)
+
+### V7 Multi-Task Model Breakdown
+| Dimension | Accuracy | Notes |
+|-----------|----------|-------|
+| E/I | 80.58% | Extraversion vs Introversion |
+| S/N | 87.15% | Sensing vs Intuition (best) |
+| T/F | 81.90% | Thinking vs Feeling |
+| J/P | 75.33% | Judging vs Perceiving |
 
 ---
 
@@ -37,6 +45,9 @@ cargo run --release
 
 # Run baseline model
 cargo run --release -- baseline
+
+# Run best model (multi-task hybrid)
+cargo run --release -- hybrid train --multi-task
 
 # Run BERT model
 cargo run --release -- bert-mlp

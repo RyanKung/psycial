@@ -69,6 +69,8 @@ pub fn evaluate_multitask_model(
     }
 
     let test_predictions = mlp.predict_batch(&test_features);
+    
+    // Calculate overall accuracy
     let mut correct = 0;
     for (pred, label) in test_predictions.iter().zip(test_labels.iter()) {
         if pred == label {
@@ -76,7 +78,45 @@ pub fn evaluate_multitask_model(
         }
     }
     let test_acc = correct as f64 / test_labels.len() as f64;
-    println!("  Accuracy: {:.2}%", test_acc * 100.0);
+    
+    // Calculate per-dimension accuracy
+    let mut dim_correct = [0usize; 4]; // [E/I, S/N, T/F, J/P]
+    let total = test_labels.len();
+    
+    for (pred, label) in test_predictions.iter().zip(test_labels.iter()) {
+        let pred_chars: Vec<char> = pred.chars().collect();
+        let label_chars: Vec<char> = label.chars().collect();
+        
+        if pred_chars.len() >= 4 && label_chars.len() >= 4 {
+            // E/I dimension
+            if pred_chars[0] == label_chars[0] {
+                dim_correct[0] += 1;
+            }
+            // S/N dimension
+            if pred_chars[1] == label_chars[1] {
+                dim_correct[1] += 1;
+            }
+            // T/F dimension
+            if pred_chars[2] == label_chars[2] {
+                dim_correct[2] += 1;
+            }
+            // J/P dimension
+            if pred_chars[3] == label_chars[3] {
+                dim_correct[3] += 1;
+            }
+        }
+    }
+    
+    println!("  Overall Accuracy: {:.2}%", test_acc * 100.0);
+    println!("  Per-Dimension Accuracy:");
+    println!("    E/I: {:.2}% ({}/{})", 
+        dim_correct[0] as f64 / total as f64 * 100.0, dim_correct[0], total);
+    println!("    S/N: {:.2}% ({}/{})", 
+        dim_correct[1] as f64 / total as f64 * 100.0, dim_correct[1], total);
+    println!("    T/F: {:.2}% ({}/{})", 
+        dim_correct[2] as f64 / total as f64 * 100.0, dim_correct[2], total);
+    println!("    J/P: {:.2}% ({}/{})", 
+        dim_correct[3] as f64 / total as f64 * 100.0, dim_correct[3], total);
     println!("  Time: {:.2}s\n", test_start.elapsed().as_secs_f64());
 
     print_results(test_acc);
@@ -167,15 +207,12 @@ pub fn print_results(test_acc: f64) {
         "| Hybrid (current)                           | {:>6.2}%  |",
         test_acc * 100.0
     );
-    println!("| Paper Target (BERT + Transformer)          |  86.30%  |");
     println!("+--------------------------------------------+----------+\n");
 
     let improvement = (test_acc - 0.2173) / 0.2173 * 100.0;
-    let vs_paper = test_acc / 0.8630 * 100.0;
 
     println!("Analysis:");
     println!("  Improvement over baseline: {:.1}%", improvement);
-    println!("  Progress toward paper: {:.1}%", vs_paper);
     println!("  vs Random: {:.1}x better\n", test_acc / 0.0625);
 
     if test_acc > 0.55 {
