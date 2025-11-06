@@ -5,8 +5,8 @@
 
   [![Rust](https://img.shields.io/badge/Rust-100%25-orange)](https://www.rust-lang.org/)
   [![Accuracy](https://img.shields.io/badge/Best-52.05%25-success)](https://github.com)
-  [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-  [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-yellow)](https://huggingface.co/ElderRyan/polyjuice)
+  [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+  [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-yellow)](https://huggingface.co/ElderRyan/psycial)
 
   **Production-grade MBTI personality classification system** with neural network implementation in pure Rust.
 </div>
@@ -34,7 +34,7 @@
 | T/F | 81.67% | Thinking vs Feeling |
 | J/P | 77.12% | Judging vs Perceiving |
 
-**🤗 Pre-trained Model**: Available on [Hugging Face](https://huggingface.co/ElderRyan/polyjuice)
+**🤗 Pre-trained Model**: Available on [Hugging Face](https://huggingface.co/ElderRyan/psycial)
 
 ---
 
@@ -49,8 +49,8 @@ from huggingface_hub import hf_hub_download
 import shutil
 
 # Download model files
-mlp_weights = hf_hub_download(repo_id="ElderRyan/polyjuice", filename="mlp_weights_multitask.pt")
-vectorizer = hf_hub_download(repo_id="ElderRyan/polyjuice", filename="tfidf_vectorizer_multitask.json")
+mlp_weights = hf_hub_download(repo_id="ElderRyan/psycial", filename="mlp_weights_multitask.pt")
+vectorizer = hf_hub_download(repo_id="ElderRyan/psycial", filename="tfidf_vectorizer_multitask.json")
 
 # Copy to models directory
 shutil.copy(mlp_weights, "models/mlp_weights_multitask.pt")

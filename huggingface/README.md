@@ -42,7 +42,7 @@ ls -lh models/tfidf_vectorizer_multitask.json
 cd huggingface
 
 # Upload to lderRyan/polyjuice
-python upload_to_hf.py --repo-id lderRyan/polyjuice
+python upload_to_hf.py --repo-id ElderRyan/psycial
 
 # Specify token if needed
 python upload_to_hf.py \
@@ -66,12 +66,12 @@ from huggingface_hub import hf_hub_download
 
 # Download model files
 mlp_weights = hf_hub_download(
-    repo_id="lderRyan/polyjuice",
+    repo_id="ElderRyan/psycial",
     filename="mlp_weights_multitask.pt"
 )
 
 tfidf_vectorizer = hf_hub_download(
-    repo_id="lderRyan/polyjuice",
+    repo_id="ElderRyan/psycial",
     filename="tfidf_vectorizer_multitask.json"
 )
 ```
@@ -93,4 +93,4 @@ tfidf_vectorizer = hf_hub_download(
 
 ## License
 
-MIT License
+GPLv3 License
