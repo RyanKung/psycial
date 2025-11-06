@@ -26,8 +26,7 @@ fn calculate_accuracy(predictions: &[String], actual: &[String]) -> f64 {
 
 pub fn main_psyattention(_args: Vec<String>) -> Result<(), Box<dyn Error>> {
     println!("=== PsyAttention: MBTI Personality Classifier ===\n");
-    println!("Based on: 'PsyAttention: Psychological Attention Model for Personality Detection'");
-    println!("Baohua Zhang et al., Beijing Institute of Technology, 2023\n");
+    println!("Simplified psychological feature extraction\n");
 
     // Load data
     println!("Loading data from CSV...");
@@ -168,10 +167,8 @@ pub fn main_psyattention(_args: Vec<String>) -> Result<(), Box<dyn Error>> {
     }
 
     println!("\n=== Training Complete ===");
-    println!("\nComparison with Paper:");
-    println!("  Paper (PsyAttention): 86.30%");
-    println!("  Our Implementation:   {:.2}%", test_accuracy * 100.0);
-    println!("\nNote: Full paper accuracy requires:");
+    println!("\nCurrent accuracy: {:.2}%", test_accuracy * 100.0);
+    println!("\nNote: Further improvements could include:");
     println!("  - All 930 psychological features (we use top 9)");
     println!("  - 8-layer Transformer encoder (we use weighted attention)");
     println!("  - BERT fine-tuning (not implemented)");

@@ -143,7 +143,6 @@ pub fn main_bert_mlp(_args: Vec<String>) -> Result<(), Box<dyn Error>> {
         "| BERT + MLP (Neural Network)            | {:>6.2}%  |",
         test_acc * 100.0
     );
-    println!("| Paper Target (BERT + Transformer)      |  86.30%  |");
     println!("+----------------------------------------+----------+\n");
 
     if test_acc > 0.2173 {

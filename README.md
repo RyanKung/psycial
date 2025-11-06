@@ -276,17 +276,6 @@ snapMBTI/
 - Learns non-linear decision boundaries
 - **Result**: Properly utilizes BERT
 
-### Comparison to Paper
-
-| Component | Our Implementation | Paper | Gap |
-|-----------|-------------------|-------|-----|
-| BERT | ✅ sentence-transformers | ✅ BERT-base | Similar |
-| Classifier | ✅ 3-layer MLP | ✅ 8-layer Transformer + MLP | Architecture depth |
-| Training | ✅ Single-stage | ✅ Two-stage (BERT alignment) | Training strategy |
-| Accuracy | **31.99%** | **86.30%** | 54.31% |
-
-**To reach 86%**: Need 8-layer Transformer encoder + two-stage training
-
 ---
 
 ## Benchmarks (M1 Max)

@@ -24,8 +24,6 @@ pub fn main_psyattention_bert(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
     println!("║                                                           ║");
     println!("╚═══════════════════════════════════════════════════════════╝\n");
 
-    println!("📄 Paper: PsyAttention (Zhang et al., 2023)");
-    println!("🎯 Target: 86.30% accuracy");
     println!("🦀 Implementation: Rust API (libtorch backend)");
     println!("📚 Library: rust-bert v0.22");
     println!("🔗 https://github.com/guillaume-be/rust-bert\n");
@@ -132,15 +130,12 @@ pub fn main_psyattention_bert(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
         "│ PsyAttention + Real BERT (Pure Rust)       │ {:>6.2}%  │",
         test_acc * 100.0
     );
-    println!("│ Paper Target (+ 8-layer Transformer)       │  86.30%  │");
     println!("└────────────────────────────────────────────┴──────────┘\n");
 
     let vs_random = test_acc / 0.0625;
-    let vs_paper = (test_acc / 0.8630) * 100.0;
 
     println!("Analysis:");
     println!("   • {:.1}x better than random guessing", vs_random);
-    println!("   • {:.1}% of paper target achieved", vs_paper);
     println!();
 
     println!("🎉 Key Achievements:");
@@ -155,8 +150,8 @@ pub fn main_psyattention_bert(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
         println!("💡 Performance below expectations?");
         println!("   This may be due to:");
         println!("   • Simplified classifier (k-NN vs neural network)");
-        println!("   • No Transformer encoder (paper uses 8 layers)");
-        println!("   • Single-stage training (paper uses 2-stage)");
+        println!("   • No Transformer encoder");
+        println!("   • Single-stage training");
         println!("   • Limited data augmentation");
         println!();
     }

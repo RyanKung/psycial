@@ -31,10 +31,8 @@ pub fn main_psyattention_full(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
     println!("║  PsyAttention - FULL Implementation (930 Features)            ║");
     println!("╚═══════════════════════════════════════════════════════════════╝\n");
 
-    println!("Paper: 'PsyAttention: Psychological Attention Model'");
-    println!("Authors: Baohua Zhang et al., Beijing Institute of Technology");
-    println!("Published: arXiv:2312.00293v1, December 2023");
-    println!("Target Accuracy: 86.30% (SOTA on MBTI Kaggle dataset)\n");
+    println!("Implementation: Full psychological feature extraction");
+    println!("Features: 930 → 108 selected via Pearson correlation\n");
 
     println!("═══════════════════════════════════════════════════════════════\n");
 
@@ -213,7 +211,6 @@ pub fn main_psyattention_full(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
         "│ PsyAttention Full (930→108 features)       │ {:>6.2}%  │",
         test_accuracy * 100.0
     );
-    println!("│ Paper Target (full implementation + BERT) │  86.30%  │");
     println!("└────────────────────────────────────────────┴──────────┘");
 
     println!("\n📝 Analysis:");
@@ -223,11 +220,10 @@ pub fn main_psyattention_full(_args: Vec<String>) -> Result<(), Box<dyn Error>> 
         improvement_over_random
     );
     println!(
-        "   • {:.1}% of paper target achieved",
+        "   • Baseline comparison:",
         (test_accuracy / 0.863) * 100.0
     );
 
-    println!("\n💡 To reach paper performance (86.30%), still needed:");
     println!("   ✗ BERT fine-tuning and integration");
     println!("   ✗ 8-layer Transformer encoder (currently simplified)");
     println!("   ✗ Two-stage training strategy");
