@@ -4,8 +4,9 @@
   # MBTI Personality Classifier
 
   [![Rust](https://img.shields.io/badge/Rust-100%25-orange)](https://www.rust-lang.org/)
-  [![Accuracy](https://img.shields.io/badge/Best-49.80%25-success)](https://github.com)
+  [![Accuracy](https://img.shields.io/badge/Best-52.05%25-success)](https://github.com)
   [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+  [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-yellow)](https://huggingface.co/ElderRyan/polyjuice)
 
   **Production-grade MBTI personality classification system** with neural network implementation in pure Rust.
 </div>
@@ -16,7 +17,7 @@
 
 | Model | Method | Accuracy | vs Random | Training Time |
 |-------|--------|----------|-----------|---------------|
-| **V7** | **🏆 TF-IDF + BERT + Multi-Task GPU** | **49.80%** | **8.0x** | ~50s | ⭐ **BEST** |
+| **V7** | **🏆 TF-IDF + BERT + Multi-Task GPU** | **52.05%** | **8.3x** | ~50s | ⭐ **BEST** |
 | V6 | BERT + MLP (single-task) | 31.99% | 5.1x | 322s |
 | V1 | TF-IDF + Naive Bayes | 21.73% | 3.5x | 2s |
 | V2 | 9 Psychological Features | 21.21% | 3.4x | 3s |
@@ -28,16 +29,40 @@
 ### V7 Multi-Task Model Breakdown
 | Dimension | Accuracy | Notes |
 |-----------|----------|-------|
-| E/I | 80.58% | Extraversion vs Introversion |
-| S/N | 87.15% | Sensing vs Intuition (best) |
-| T/F | 81.90% | Thinking vs Feeling |
-| J/P | 75.33% | Judging vs Perceiving |
+| E/I | 82.77% | Extraversion vs Introversion |
+| S/N | 88.18% | Sensing vs Intuition (best) |
+| T/F | 81.67% | Thinking vs Feeling |
+| J/P | 77.12% | Judging vs Perceiving |
+
+**🤗 Pre-trained Model**: Available on [Hugging Face](https://huggingface.co/ElderRyan/polyjuice)
 
 ---
 
 ## Quick Start
 
-### As a CLI Tool
+### Option 1: Use Pre-trained Model from Hugging Face
+
+Download the trained model and start predicting immediately:
+
+```python
+from huggingface_hub import hf_hub_download
+import shutil
+
+# Download model files
+mlp_weights = hf_hub_download(repo_id="ElderRyan/polyjuice", filename="mlp_weights_multitask.pt")
+vectorizer = hf_hub_download(repo_id="ElderRyan/polyjuice", filename="tfidf_vectorizer_multitask.json")
+
+# Copy to models directory
+shutil.copy(mlp_weights, "models/mlp_weights_multitask.pt")
+shutil.copy(vectorizer, "models/tfidf_vectorizer_multitask.json")
+```
+
+Then use the Rust binary for prediction:
+```bash
+./target/release/psycial hybrid predict "Your text here"
+```
+
+### Option 2: Train from Scratch
 
 ```bash
 # Show all available models
