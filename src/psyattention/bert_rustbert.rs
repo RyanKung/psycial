@@ -1,5 +1,5 @@
 //! Real BERT using rust-bert (Rust API, libtorch backend)
-//! Based on: https://github.com/guillaume-be/rust-bert
+//! Based on: <https://github.com/guillaume-be/rust-bert>
 
 #[cfg(feature = "bert")]
 use rust_bert::pipelines::sentence_embeddings::{

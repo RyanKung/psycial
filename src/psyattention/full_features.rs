@@ -140,7 +140,7 @@ impl PearsonFeatureSelector {
         selected
     }
 
-    /// Fit on simple Vec<Vec<f64>> data (convenience method)
+    /// Fit on simple `Vec<Vec<f64>>` data (convenience method)
     pub fn fit_simple(&mut self, features: &[Vec<f64>], target_features: usize) -> Vec<usize> {
         let n_samples = features.len();
         let n_features = if features.is_empty() {
