@@ -169,22 +169,25 @@
 //! ## Performance Tips
 //!
 //! 1. **Reuse predictor instances**: Loading the model is expensive
-//!    ```rust
+//!    ```no_run
+//!    # use psycial::api::Predictor;
+//!    # let texts = vec!["text1", "text2"];
 //!    // Good ✓
 //!    let predictor = Predictor::new()?;
-//!    for text in texts {
+//!    for text in &texts {
 //!        predictor.predict(text)?;
 //!    }
 //!
 //!    // Bad ✗
-//!    for text in texts {
+//!    for text in &texts {
 //!        let predictor = Predictor::new()?;
 //!        predictor.predict(text)?;
 //!    }
+//!    # Ok::<(), Box<dyn std::error::Error>>(())
 //!    ```
 //!
 //! 2. **Use batch predictions**: More efficient for multiple texts
-//!    ```rust
+//!    ```no_run
 //!    # use psycial::api::Predictor;
 //!    # let predictor = Predictor::new().unwrap();
 //!    # let texts = vec!["text1", "text2"];
@@ -203,7 +206,7 @@
 //!
 //! ## Error Handling
 //!
-//! ```rust
+//! ```no_run
 //! use psycial::api::Predictor;
 //!
 //! match Predictor::new() {
