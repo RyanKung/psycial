@@ -31,5 +31,14 @@ if ! cargo test --lib; then
     exit 1
 fi
 
+# Check documentation warnings
+echo "📚 Checking documentation..."
+DOC_OUTPUT=$(cargo doc --no-deps 2>&1)
+if echo "$DOC_OUTPUT" | grep -qE "warning|error"; then
+    echo "❌ Documentation has warnings or errors!"
+    echo "$DOC_OUTPUT" | grep -E "warning|error" | head -20
+    exit 1
+fi
+
 echo "✅ All pre-commit checks passed!"
 
