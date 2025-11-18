@@ -619,7 +619,10 @@ mod tests {
         // Mean word length should be very high
         assert!(features[8] > 10.0);
 
-        // Very long words ratio should be high
-        assert!(features[12] > 0.0);
+        // Very long words (>10 chars) ratio should be high
+        assert!(features[11] > 0.0, "Very long words ratio should be > 0");
+
+        // Short words (<4 chars) ratio should be 0 for this text
+        assert_eq!(features[12], 0.0, "Short words ratio should be 0 for long words");
     }
 }
