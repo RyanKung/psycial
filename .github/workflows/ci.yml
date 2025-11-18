@@ -161,7 +161,11 @@ jobs:
           }
       
       - name: Run doc tests
-        run: cargo test --doc
+        run: |
+          timeout 60 cargo test --doc || {
+            echo "ERROR: Doc tests failed or timed out"
+            exit 1
+          }
 
   # Security audit
   security-audit:
