@@ -240,7 +240,7 @@
 //!
 //! ## Links
 //!
-//! - **GitHub**: <https://github.com/RyanKung/psycial>
+//! - **GitHub**: <https://github.com/polyjuicelab/psycial>
 //! - **Hugging Face**: <https://huggingface.co/ElderRyan/psycial>
 //! - **Web Demo**: <https://psycial.0xbase.ai>
 //!

@@ -3,7 +3,7 @@
   
   # MBTI Personality Classifier
 
-  [![CI](https://github.com/RyanKung/psycial/actions/workflows/ci.yml/badge.svg)](https://github.com/RyanKung/psycial/actions/workflows/ci.yml)
+  [![CI](https://github.com/polyjuicelab/psycial/actions/workflows/ci.yml/badge.svg)](https://github.com/polyjuicelab/psycial/actions/workflows/ci.yml)
   [![Rust](https://img.shields.io/badge/Rust-100%25-orange)](https://www.rust-lang.org/)
   [![Accuracy](https://img.shields.io/badge/Best-52.05%25-success)](https://github.com)
   [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
@@ -114,7 +114,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-psycial = { git = "https://github.com/yourusername/psycial", features = ["bert"] }
+psycial = { git = "https://github.com/polyjuicelab/psycial", features = ["bert"] }
 ```
 
 Use in your code:
