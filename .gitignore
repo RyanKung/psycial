@@ -18,6 +18,7 @@ Thumbs.db
 # All markdown files except essential docs
 *.md
 !README.md
+!CONTRIBUTING.md
 *.sh
 *.pdf
 *.py
